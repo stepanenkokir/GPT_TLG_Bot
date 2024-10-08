@@ -1,0 +1,6 @@
+/config
+/log
+/voices/*.ogg
+/voices/*.mp3
+/node_modules
+authorizedUsers.txt
