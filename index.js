@@ -5,6 +5,7 @@ import { createOpenAiInstance } from './script/openai.js'
 import { setupBotCommands } from './script/telegramBot.js'
 import { checkAuthUserImproved } from './middleware/checkAuthUser.js'
 import { createLogger, format, transports }from 'winston'
+import JokeSender from './script/jokeSender.js'
 
 // Настройки конфигурации из config/default.json
 const botToken = config.get('telegramBot.token')
@@ -39,6 +40,9 @@ bot.use(checkAuthUserImproved, saveLog)
 
 // Настройка команд бота
 setupBotCommands(bot)
+
+const jokeSender = new JokeSender('listToSendJoke.txt')
+jokeSender.startDailyJob()
 
 bot.launch().then(() => {
     console.log('Бот запущен')
