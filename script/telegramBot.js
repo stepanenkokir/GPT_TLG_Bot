@@ -29,26 +29,33 @@ const setRole = async (ctx) =>{
 const createNewSession = async ( ctx, 
     currRole = 'Ты весёлый помощник по имени Дилан. Ты стараешься отвечать с юмором'
     ) => {
-    await ctx.telegram.sendChatAction(ctx.chat.id, "typing")
-    session[ctx.chat.id] = {
-        messages    : [],
-        created     : new Date(),
-        parametres  : parametres
-    }
-    session[ctx.chat.id].messages = [{role : roles.SYSTEM, content : currRole }]
-    await ctx.reply(code('Ok'))
+        try {
+            await ctx.telegram.sendChatAction(ctx.chat.id, "typing")
+            session[ctx.chat.id] = {
+                messages    : [],
+                created     : new Date(),
+                parametres  : parametres
+            }
+            session[ctx.chat.id].messages = [{role : roles.SYSTEM, content : currRole }]
+            const file_id = 'CAACAgIAAxkBAAILXGcIz5dXde_lMvnbDG7VHZriKgYBAAJjAAO2j0oJI4AaNSm1CfM2BA'
+            await ctx.replyWithSticker(file_id)
+            await ctx.reply(code('Ух. Почистил себе память..'))        
+        } catch (error) {
+            console.log('Не могу почистить память ',error)
+        }
+    
 }
 
-const checkSession = (ctx) => {
+const checkSession = async (ctx) => {
     console.log("Check session")
-    if (!session[ctx.chat.id]?.messages){
-        createNewSession(ctx)
+    if (!session[ctx.chat.id]?.parametres){
+        await createNewSession(ctx)
         return false
     }
     const currentTime  = new Date()
 
-    if (currentTime - session[ctx.chat.id].created > 30 * 60 * 1000) {
-        createNewSession(ctx)
+    if (currentTime - session[ctx.chat.id].created > 10 * 60 * 1000) {
+        await createNewSession(ctx)
         return false
     }
     return true
@@ -56,7 +63,7 @@ const checkSession = (ctx) => {
 
 const textHandler = async (ctx, userMessage) => {
     
-    checkSession(ctx)
+    await checkSession(ctx)
         
     try {
 
@@ -109,41 +116,41 @@ const textHandler = async (ctx, userMessage) => {
 }
 
 const realImage = async (ctx) => {
-    checkSession(ctx)
+    await checkSession(ctx)
     await ctx.reply('Опиши детально что нарисовать как фото')
     session[ctx.chat.id].parametres.drawImage = true
     session[ctx.chat.id].parametres.realImage = true
 }
 
 const surrImage = async (ctx) => {
-    checkSession(ctx)
+    await checkSession(ctx)
     await ctx.reply('Опиши детально что нарисовать')
     session[ctx.chat.id].parametres.drawImage = true
     session[ctx.chat.id].parametres.realImage = false
 }
 
 const selectVoice = async (ctx) => {
-    checkSession(ctx)
+    await checkSession(ctx)
     console.log("SELECT VOICE")
     await ctx.reply('Ответы будут голосом', menu.voiceTextMenu)
     session[ctx.chat.id].parametres.answerVoice = true
 }
 const selectText = async (ctx) => {
-    checkSession(ctx)
+    await checkSession(ctx)
     console.log("SELECT TEXT")
     await ctx.reply('Ответы будут текстом', menu.voiceMenu)
     session[ctx.chat.id].parametres.answerVoice = false
 }
 
 const setMaleVoice = async (ctx) => {
-    checkSession(ctx)
+    await checkSession(ctx)
     console.log("SELECT Male")
     await ctx.reply('Ответы будут мужским голосом')
     session[ctx.chat.id].parametres.voiceMale = true
 }
 
 const setWomanVoice = async (ctx) => {
-    checkSession(ctx)
+    await  checkSession(ctx)
     console.log("SELECT FEMALE")
     await ctx.reply('Ответы будут женским голосом')
     session[ctx.chat.id].parametres.voiceMale = false
@@ -164,7 +171,7 @@ export function setupBotCommands(bot) {
         welcomeMsg(ctx)
     })
 
-    bot.hears(menu.menuNewSession, (ctx) => createNewSession(ctx))
+    bot.hears(menu.menuNewSession, createNewSession)
     bot.hears(menu.menuRole, setRole)
     bot.hears(menu.menuBack, backMsg)
 
