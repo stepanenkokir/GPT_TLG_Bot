@@ -11,6 +11,15 @@ const roles = {
     SYSTEM: 'system',
 }
 
+const stickersGvineaPig = [    
+    'CAACAgIAAxkBAAILXGcIz5dXde_lMvnbDG7VHZriKgYBAAJjAAO2j0oJI4AaNSm1CfM2BA',
+    'CAACAgIAAxkBAAILsGcMf8U7inPKs-hXrq_OGN-J9tgFAAJGAAOvxlEabdtbgJpfZjo2BA',
+    'CAACAgIAAxkBAAILr2cMf7xQ9ElczU1-2rUIHwABtsuF0gACFgADr8ZRGup1yzuO6cBRNgQ',
+    'CAACAgIAAxkBAAILlmcMfq4QHEQm-GI2fgFIU6kjN0rPAAIHAAOvxlEauNf458e89zQ2BA',
+    'CAACAgIAAxkBAAILk2cMfn2TKscbUzdPtjz5DzqNPwhzAAIDAAOvxlEa6DmfjqiNi6E2BA',
+    'CAACAgIAAxkBAAILoGcMf1EhEA_BIZ00yoJt6OXZJ9RVAAIOAAOvxlEat1uC7H4BJ_c2BA',
+]
+
 const parametres = {
     setrole         : false,
     answerVoice     : false,
@@ -27,7 +36,7 @@ const setRole = async (ctx) =>{
 }
 
 const createNewSession = async ( ctx, 
-    currRole = 'Ты весёлый помощник по имени Дилан. Ты стараешься отвечать с юмором'
+    currRole = 'Ты весёлый помощник по имени Дилан. Ты стараешься отвечать с юмором и сарказмом.'
     ) => {
         try {
             await ctx.telegram.sendChatAction(ctx.chat.id, "typing")
@@ -37,9 +46,13 @@ const createNewSession = async ( ctx,
                 parametres  : parametres
             }
             session[ctx.chat.id].messages = [{role : roles.SYSTEM, content : currRole }]
-            const file_id = 'CAACAgIAAxkBAAILXGcIz5dXde_lMvnbDG7VHZriKgYBAAJjAAO2j0oJI4AaNSm1CfM2BA'
-            await ctx.replyWithSticker(file_id)
-            await ctx.reply(code('Ух. Почистил себе память..'))        
+
+            const randSticker = Math.floor(Math.random()*stickersGvineaPig.length)
+            console.log(randSticker)
+            const file_id = stickersGvineaPig[randSticker]
+
+            await ctx.replyWithSticker(file_id)           
+          //  console.log(session[ctx.chat.id])      
         } catch (error) {
             console.log('Не могу почистить память ',error)
         }
@@ -47,14 +60,14 @@ const createNewSession = async ( ctx,
 }
 
 const checkSession = async (ctx) => {
-    console.log("Check session")
+   // console.log("Check session")
     if (!session[ctx.chat.id]?.parametres){
         await createNewSession(ctx)
         return false
     }
     const currentTime  = new Date()
 
-    if (currentTime - session[ctx.chat.id].created > 10 * 60 * 1000) {
+    if (currentTime - session[ctx.chat.id].created > 5 * 60 * 1000) {
         await createNewSession(ctx)
         return false
     }
@@ -80,8 +93,6 @@ const textHandler = async (ctx, userMessage) => {
             await ctx.reply(response)
             return
         }
-
-        console.log("ANSWER VOICE = ",session[ctx.chat.id].parametres.answerVoice)
 
         if (session[ctx.chat.id].parametres.answerVoice){
             await ctx.telegram.sendChatAction(ctx.chat.id, "record_voice")
@@ -171,7 +182,7 @@ export function setupBotCommands(bot) {
         welcomeMsg(ctx)
     })
 
-    bot.hears(menu.menuNewSession, createNewSession)
+    bot.hears(menu.menuNewSession, async (ctx) => await createNewSession(ctx))
     bot.hears(menu.menuRole, setRole)
     bot.hears(menu.menuBack, backMsg)
 
@@ -194,6 +205,7 @@ export function setupBotCommands(bot) {
     })
 
     bot.on('message', async (ctx) => {
+        console.log(ctx.message.sticker)
         const userId = ctx.chat.id
         try {
             if (ctx.message.voice){ 

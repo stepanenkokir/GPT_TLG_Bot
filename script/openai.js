@@ -26,7 +26,7 @@ export const handleOpenAiRequest = async ( messages ) => {
         })
         return response.choices[0].message.content
     } catch (e) {
-        console.log("Error in GPT CHAT",e.message)
+        console.log("Error in GPT CHAT API",e.message)
         return {content:"Ошибка открытия чата"}
     }
 }
@@ -39,20 +39,20 @@ export const handleOpenAiRequestVoice = async ( messages, maleVoice = true ) => 
             messages,
         })
 
-        console.log(response.choices[0].message)
+       // console.log(response.choices[0].message)
         
         const mp3 = await globalOpenAI.audio.speech.create({
             model: "tts-1",
             voice: maleVoice ? "alloy" : 'nova',
             input: response.choices[0].message.content,
         })
-        console.log(speechFile);
+       // console.log(speechFile);
         const buffer = Buffer.from(await mp3.arrayBuffer());
         await fs.promises.writeFile(speechFile, buffer);
 
         return {text: response.choices[0].message.content, buffer: buffer }
     } catch (e) {
-        console.log("Error in GPT CHAT",e.message)
+        console.log("Error in GPT CHAT API VOICE",e.message)
         return {content:"Ошибка открытия чата"}
     }
 }
@@ -60,7 +60,7 @@ export const handleOpenAiRequestVoice = async ( messages, maleVoice = true ) => 
 export const handleOpenAiVoice  = async (filepath) => {
     try {
         
-        console.log("transcriptions for ",filepath)
+      //  console.log("transcriptions for ",filepath)
         const response = await globalOpenAI.audio.transcriptions.create({                
             model: 'whisper-1', 
             file: createReadStream(filepath)
@@ -75,7 +75,7 @@ export const handleOpenAiVoice  = async (filepath) => {
 
 export const createOpenAiImage = async ( prompt, quality=false ) => {
     try {
-        console.log("Draw ",quality ? 'hd' : 'standard')
+     //   console.log("Draw ",quality ? 'hd' : 'standard')
         const response = await globalOpenAI.images.generate({
             model   : "dall-e-3",
             prompt  : prompt,
