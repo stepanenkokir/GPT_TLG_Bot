@@ -29,24 +29,34 @@ class JokeSender {
     async sendJokeToAllUsers() {
 
         const themes = [
-            'Семейная жизнь – шутки о буднях супругов, отношениях с тещей или свекровью, детских высказываниях.',
-            'Работа и офис – курьезы на работе, смешные коллеги, начальник с "хорошим" чувством юмора.',
-            'Бытовые мелочи – ремонт, покупки, коммунальные службы, разговоры соседей.',
-            'Школа и учеба – учителя, экзамены, двоечники, контрольные, школьные проделки.',
-            'Врачебная тема – пациенты и врачи, смешные диагнозы и советы по "лечению".',
-            'Животные и их характер – коты как мудрецы, хитрые собаки, говорящие попугаи.',
-            'Современные технологии – гаджеты, интернет, соцсети, проблемы с зумом и чатами.',
-            'Спорт и ЗОЖ – начинающие спортсмены, тренировки в зале, несостоявшиеся диеты.',
-            'Поездки и туризм – чемоданы, курорты, экскурсии, непредвиденные приключения в отпуске.',
-            'Случайности и совпадения – неожиданные встречи, забавные ситуации в транспорте или на улице.',
+ 'Family Life – Jokes about the daily lives of spouses, in-law relationships (mother-in-law or father-in-law), and funny things kids say.',
+  'Work and Office – Workplace mishaps, funny coworkers, and bosses with a "great" sense of humor.',
+  'Everyday Nuances – Home repairs, shopping, utility services, and neighborly conversations.',
+  'School and Studying – Teachers, exams, underachievers, pop quizzes, and school pranks.',
+  'Medical Humor – Patients and doctors, funny diagnoses, and questionable medical advice.',
+  'Animals and Their Personalities – Cats as wise beings, sneaky dogs, and talkative parrots.',
+  'Modern Technology – Gadgets, the internet, social media, Zoom fails, and chat mishaps.',
+  'Sports and Fitness – Beginner athletes, gym workouts, and failed diet attempts.',
+  'Travel and Tourism – Packing suitcases, vacation resorts, guided tours, and unexpected travel adventures.',
+  'Coincidences and Randomness – Unexpected encounters, funny situations on public transport or the street.',
+  'Dating and Relationships – Awkward first dates, online dating fails, and relationship quirks.',
+  'Social Media Trends – Viral challenges, TikTok fails, and influencer culture.',
+  'Gaming and Gamers – Glitches, rage quits, and funny in-game moments.',
+  'Food and Cooking – Kitchen disasters, weird food combinations, and restaurant mishaps.',
+  'Politics and Current Events – Satirical takes on politicians, elections, and global news.',
+  'Celebrities and Pop Culture – Celebrity gossip, award show blunders, and movie/TV references.',
+  'Environmental Issues – Climate change jokes, recycling fails, and eco-friendly struggles.',
+  'Remote Work Life – Working from home, Zoom meetings in pajamas, and dealing with distractions.',
+  'Parenting Challenges – Sleep-deprived parents, toddler tantrums, and school projects gone wrong.',
+  'Fitness Trends – Yoga fails, Peloton mishaps, and over-the-top health fads.'
         ]
 
         const currTheme = themes[Math.floor(Math.random() * themes.length)];
         const positiveFinish = "Вотъ. Даже если не очень понятно - улыбнись, я ведь старался. Хорошего дня. Если что - пиши, я буду ждать 😍"
         // Генерация анекдота
         const jokeMessage = await handleOpenAiRequest([
-            { role: 'system', content: `Ты хороший рассказчик небольших анекдотов на русском языке. Предпочитаешь лаконичные. Любишь использовать разные эмодзи` },
-            { role: 'user', content: `Расскажи новый смешной анекдот: ${currTheme}` },
+            { role: 'system', content: `You're an awesome Eanglish teacher for russians and also joke teller. You create short, hilarious jokes on any topic. First, you translate the joke into Russian, keeping in mind modern Russian slang and cultural references, and then in new line you include the original English version in parentheses. ` },
+            { role: 'user', content: `Расскажи новый смешной анекдот: ${currTheme} и объясни его соль по русски если есть игра слов в английском варианте` },
             { role: 'user', content: `Закончи позитивной фразой и добавь, что жаждешь общения и готов отвечать на вопросы` },
         ])
 
@@ -55,7 +65,7 @@ class JokeSender {
             return
         }
 
-        const sendMessage = `Утренний анекдотик от Дилана\n ${jokeMessage}`
+        const sendMessage = `Учим английский по анекдотам от Дилана\n ${jokeMessage}`
 
         // Отправка анекдота всем пользователям
         for (const userId of this.userIds) {
