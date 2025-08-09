@@ -52,7 +52,7 @@ class JokeSender {
 
     const currTheme = themes[Math.floor(Math.random() * themes.length)];
     // Генерация анекдота
-    const jokeMessage = await handleOpenAiRequest([
+    const jokeResponse = await handleOpenAiRequest([
       {
         role: "system",
         content: `You're an awesome Eanglish teacher for russians and also joke teller. You create short, hilarious jokes on any topic. First, you translate the joke into Russian, keeping in mind modern Russian slang and cultural references, and then in new line you include the original English version in parentheses. `,
@@ -67,12 +67,15 @@ class JokeSender {
       },
     ]);
 
-    if (!jokeMessage) {
-      console.error("Не удалось получить анекдот.");
+    if (!jokeResponse || !jokeResponse.text) {
+      console.error(
+        "Не удалось получить анекдот:",
+        jokeResponse?.error || "Неизвестная ошибка"
+      );
       return;
     }
 
-    const sendMessage = `Учим английский по анекдотам от Дилана\n ${jokeMessage}`;
+    const sendMessage = `Учим английский по анекдотам от Дилана\n\n${jokeResponse.text}`;
 
     // Отправка анекдота всем пользователям
     for (const userId of this.userIds) {
@@ -91,7 +94,7 @@ class JokeSender {
   startDailyJob() {
     console.log("Start some at ", new Date());
     cron.schedule(
-      "0 8 * * *",
+      "8 8 * * *",
       async () => {
         console.log("Запуск ежедневной отправки анекдотов в 8 утра...");
         await this.loadUserIds();

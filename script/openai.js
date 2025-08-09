@@ -125,6 +125,57 @@ export const handleOpenAiRequest = async (messages) => {
   }
 };
 
+// Выполнить запрос с использованием Responses API и инструмента web_search
+export const handleOpenAiRequestWithWebSearch = async (
+  messages,
+  options = {}
+) => {
+  try {
+    const model = getModel();
+
+    // Преобразуем сообщения в единый текстовый ввод для Responses API
+    const chatMessages = toChatMessages(messages);
+    const input = chatMessages
+      .map((m) => {
+        const content = Array.isArray(m.content)
+          ? m.content
+              .map((p) => (typeof p === "string" ? p : p.text || ""))
+              .filter(Boolean)
+              .join("\n")
+          : String(m.content || "");
+        const role = m.role || "user";
+        if (role === "system") return `System: ${content}`;
+        if (role === "assistant") return `Assistant: ${content}`;
+        return `User: ${content}`;
+      })
+      .join("\n\n");
+
+    const tools = [
+      {
+        type: "web_search",
+        search_context_size: options.search_context_size || "medium",
+        user_location: options.user_location || {
+          type: "approximate",
+          country: "RU",
+        },
+      },
+    ];
+
+    const resp = await requestWithRetry(() =>
+      globalOpenAI.responses.create({
+        model,
+        tools,
+        input,
+      })
+    );
+
+    return { text: extractTextFromResponse(resp) };
+  } catch (e) {
+    console.error("Error in GPT Responses Web Search:", e);
+    return { text: "", error: e.message };
+  }
+};
+
 export const handleOpenAiRequestVoice = async (messages, maleVoice = true) => {
   try {
     await fs.promises.mkdir(speechDir, { recursive: true });

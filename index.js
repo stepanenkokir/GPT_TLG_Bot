@@ -1,5 +1,6 @@
 // Файл: index.js
 import JokeSender from "./script/jokeSender.js";
+import NewsSender from "./script/newsSender.js";
 import { createHttpServer } from "./server.js";
 import { launchTelegramBot } from "./bot.js";
 
@@ -12,3 +13,8 @@ launchTelegramBot();
 // Background jobs
 const jokeSender = new JokeSender("listToSendJoke.txt");
 jokeSender.startDailyJob();
+
+// News background jobs
+const newsSender = new NewsSender("listToSendJoke.txt");
+newsSender.startDailyJob();
+newsSender.startWeeklyJob();
