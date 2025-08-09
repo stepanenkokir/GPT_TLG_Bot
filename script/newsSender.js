@@ -136,7 +136,7 @@ class NewsSender {
 
     // Вечерние новости в 18:00
     cron.schedule(
-      "0 18 * * *",
+      "0 22 * * *",
       async () => {
         console.log("Запуск вечерней рассылки новостей");
         await this.loadUserIds();

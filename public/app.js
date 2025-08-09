@@ -1,11 +1,21 @@
 const micButton = document.getElementById("micButton");
 const statusLabel = document.getElementById("status");
+const roleSelect = document.getElementById("roleSelect");
 
 let pc = null;
 let micStream = null;
 let remoteAudioEl = null;
 let dataChannel = null;
 let isActive = false;
+let selectedRole = "default";
+
+// Role configurations
+const roleConfigs = {
+  default: { voice: "echo", name: "Просто Дилан" },
+  doctor: { voice: "ash", name: "Доктор наук" },
+  teacher: { voice: "sage", name: "Учительница начальной школы" },
+  hooligan: { voice: "alloy", name: "Умный хулиган" },
+};
 
 function setStatus(text) {
   statusLabel.textContent = text;
@@ -14,6 +24,15 @@ function setStatus(text) {
 function setActiveUI(active) {
   micButton.setAttribute("aria-pressed", active ? "true" : "false");
   micButton.classList.toggle("active-pulse", active);
+  // Disable role selector during active session
+  roleSelect.disabled = active;
+}
+
+function updateRoleSelection() {
+  selectedRole = roleSelect.value;
+  console.log(
+    `Role selected: ${roleConfigs[selectedRole].name} (${roleConfigs[selectedRole].voice})`
+  );
 }
 
 function isRunningInTelegram() {
@@ -48,6 +67,12 @@ async function startRealtime() {
     window.Telegram.WebApp.expand();
   } catch (_) {}
   setStatus("Подготовка соединения...");
+
+  // Send role selection to server
+  const sessionToken = await sendRoleToServer();
+
+  console.log("Session token:", sessionToken.client_secret);
+  const EPHEMERAL_KEY = sessionToken.client_secret.value;
 
   setStatus("Инициализация WebRTC...");
   pc = new RTCPeerConnection();
@@ -104,6 +129,7 @@ async function startRealtime() {
     method: "POST",
     body: offer.sdp,
     headers: {
+      Authorization: `Bearer ${EPHEMERAL_KEY}`,
       "Content-Type": "application/sdp",
       "x-telegram-init-data": getInitData(),
       "x-webapp-token": getUrlToken() || "",
@@ -164,6 +190,37 @@ async function stopRealtime() {
   }
 }
 
+async function sendRoleToServer() {
+  try {
+    const response = await fetch("/api/set-role", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-telegram-init-data": getInitData(),
+        "x-webapp-token": getUrlToken() || "",
+      },
+      body: JSON.stringify({
+        role: selectedRole,
+        voice: roleConfigs[selectedRole].voice,
+        name: roleConfigs[selectedRole].name,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to set role: ${response.status}`);
+    }
+
+    console.log(`Role sent to server: ${roleConfigs[selectedRole].name}`);
+    return response.json();
+  } catch (error) {
+    console.error("Error sending role to server:", error);
+    // Don't throw error, continue with session start
+  }
+}
+
+// Event listeners
+roleSelect.addEventListener("change", updateRoleSelection);
+
 micButton.addEventListener("click", async () => {
   if (isActive) {
     setActiveUI(false);
@@ -184,3 +241,6 @@ micButton.addEventListener("click", async () => {
     await stopRealtime();
   }
 });
+
+// Initialize role selection
+updateRoleSelection();

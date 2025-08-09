@@ -9,6 +9,25 @@ import { isUserAuthorized } from "../middleware/checkAuthUser.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const ProfessorVoice = `Ты профессор Дилан, ты разбираешься в медицине и можешь давать полезные советы по здоровью и лечению. Ответы короткие, не более 20 слов.`;
+
+const TeacherVoice = `Ты учительница Дилан, ты объясняешь любые темы, языком, доступным для детей 5-7 лет. Ответы короткие, не более 20 слов.`;
+
+const HooliGanVoice = `Ты дерзкий хулиган Дилан, ты можешь говорить на разных языках, и ты можешь быть очень смешным и веселым. 
+И добавлять в лексику хулиганские слова. Ответы короткие, не более 10 слов.`;
+
+const DylanVoice = `Ты саркастичный Дилан, ты можешь быть очень саркастичным и смешным. Ответы короткие, не более 20 слов.`;
+
+const MODEL = (() => {
+  try {
+    return config.get("openai.realtimeModel");
+  } catch (_) {
+    return "gpt-4o-realtime-preview-2025-06-03";
+  }
+})();
+
+const API_KEY = config.get("openai.apiKey");
+
 function verifyInitData(raw, botToken) {
   if (!raw || typeof raw !== "string") return { ok: false };
   const params = new URLSearchParams(raw);
@@ -81,6 +100,86 @@ export function registerApiRoutes(app) {
   // Serve static public assets
   app.use(express.static(path.join(__dirname, "../public")));
 
+  // Set role endpoint
+  app.post("/api/set-role", express.json(), async (req, res) => {
+    try {
+      const initData = req.header("x-telegram-init-data") || "";
+      const webToken = req.header("x-webapp-token") || "";
+
+      if (!testMode) {
+        const verification = verifyInitData(initData, botToken);
+        const tokenData = verifyWebToken(webToken, botToken);
+        const userIdToCheck = verification.userId || tokenData?.uid;
+        if (
+          !verification.ok ||
+          !userIdToCheck ||
+          !isUserAuthorized(userIdToCheck)
+        ) {
+          return res.status(401).json({ error: "Unauthorized" });
+        }
+      }
+
+      const { role, voice, name } = req.body;
+
+      if (!role || !voice || !name) {
+        return res.status(400).json({ error: "Missing role data" });
+      }
+
+      // Store role selection in session or temporary storage
+      // For now, just log it - you can implement session storage later
+      console.log(`User role set: ${name} (${voice}) - Role: ${role}`);
+
+      const roleInstruction = role;
+
+      let voiceInstruction = DylanVoice;
+      switch (voice) {
+        case "doctor":
+          voiceInstruction = ProfessorVoice;
+          break;
+        case "teacher":
+          voiceInstruction = TeacherVoice;
+          break;
+        case "hooligan":
+          voiceInstruction = HooliGanVoice;
+          break;
+
+        default:
+          voiceInstruction = DylanVoice;
+          break;
+      }
+
+      const resp = await fetch("https://api.openai.com/v1/realtime/sessions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          voice: voice,
+          instructions: roleInstruction + " " + voiceInstruction,
+          input_audio_format: "pcm16",
+          output_audio_format: "pcm16",
+          input_audio_transcription: {
+            model: "whisper-1",
+          },
+        }),
+      });
+
+      if (!resp.ok) {
+        console.log(`OpenAI API error: ${resp.status} ${resp.statusText}`);
+        throw new Error(`OpenAI API error: ${resp.status} ${resp.statusText}`);
+      }
+
+      const json = await resp.json();
+      console.log("Session created successfully");
+      res.json(json);
+    } catch (error) {
+      console.error("Error setting role:", error);
+      res.status(500).json({ error: "Failed to set role" });
+    }
+  });
+
   // Proxy WebRTC SDP exchange to OpenAI Realtime. Body is raw SDP text
   app.post(
     "/realtime/sdp",
@@ -106,27 +205,17 @@ export function registerApiRoutes(app) {
           }
         }
 
-        const apiKey = config.get("openai.apiKey");
-        const model = (() => {
-          try {
-            return config.get("openai.realtimeModel");
-          } catch (_) {
-            return "gpt-4o-realtime-preview-2025-06-03";
-          }
-        })();
-
         const offerSdp = req.body || "";
         if (offerSdp.length === 0) {
           return res.status(400).json({ error: "Empty SDP" });
         }
 
-        console.log("Realtime model", model);
         const url = `https://api.openai.com/v1/realtime?model=${encodeURIComponent(
-          model
+          MODEL
         )}`;
         const oaResp = await axios.post(url, offerSdp, {
           headers: {
-            Authorization: `Bearer ${apiKey}`,
+            Authorization: req.headers.authorization,
             "Content-Type": "application/sdp",
             "OpenAI-Beta": "realtime=v1",
           },
