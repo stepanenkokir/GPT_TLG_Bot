@@ -1,13 +1,14 @@
 // Файл: telegramBot.js
-import { code } from "telegraf/format";
 import {
   createOpenAiImage,
   handleOpenAiRequest,
   handleOpenAiVoice,
   handleOpenAiRequestVoice,
+  streamOpenAiText,
 } from "./openai.js";
 import { ogg } from "./ogg.js";
 import * as menu from "./tlgBotMenu.js";
+import config from "config";
 
 const roles = {
   ASSISTANT: "assistant",
@@ -28,7 +29,6 @@ const defaultParameters = () => ({
   setrole: false,
   answerVoice: false,
   drawImage: false,
-  realImage: true,
   voiceLang: "Russian",
   voiceMale: true,
 });
@@ -85,12 +85,14 @@ const textHandler = async (ctx, userMessage) => {
 
     if (ctx.session.parametres.drawImage) {
       await ctx.telegram.sendChatAction(ctx.chat.id, "upload_photo");
-      const response = await createOpenAiImage(
-        userMessage,
-        ctx.session.parametres.realImage
-      );
+      const response = await createOpenAiImage(userMessage);
       ctx.session.parametres.drawImage = false;
-      await ctx.reply(response);
+      // Если пришёл валидный URL от генерации — отправляем как фото, иначе текст
+      if (response && /^https?:\/\//i.test(response)) {
+        await ctx.replyWithPhoto(response);
+      } else {
+        await ctx.reply(response || "Не удалось получить изображение");
+      }
       return;
     }
 
@@ -109,40 +111,132 @@ const textHandler = async (ctx, userMessage) => {
         });
         await ctx.replyWithVoice({ source: response.buffer });
       } else {
-        await ctx.reply(
-          "Что-то я устал, надо поспать... Попробуй спросить меня попозже"
-        );
+        await ctx.reply("Что-то я устал, надо поспать... Давай позже");
       }
     } else {
+      // Streaming text reply with live edits
       await ctx.telegram.sendChatAction(ctx.chat.id, "typing");
       ctx.session.messages.push({ role: roles.USER, content: userMessage });
-      const response = await handleOpenAiRequest(ctx.session.messages);
-      if (response) {
-        ctx.session.messages.push({ role: roles.ASSISTANT, content: response });
-        await ctx.reply(response, { parse_mode: "Markdown" });
-      } else {
-        await ctx.reply(
-          "Что-то я устал, надо поспать... Попробуй спросить меня попозже"
-        );
-      }
+
+      // Placeholder message that we continuously edit
+      const placeholder = await ctx.reply("Печатаю ответ…");
+
+      let accumulated = "";
+      let lastEditAt = 0;
+      let typingTimer = setInterval(() => {
+        ctx.telegram.sendChatAction(ctx.chat.id, "typing").catch(() => {});
+      }, 1000);
+
+      let finalized = false;
+      const tryFinalize = async () => {
+        if (finalized) return;
+        finalized = true;
+        clearInterval(typingTimer);
+        if (accumulated.trim().length > 0) {
+          // Final update with full text (guard against identical content)
+          try {
+            await ctx.telegram.editMessageText(
+              ctx.chat.id,
+              placeholder.message_id,
+              undefined,
+              accumulated
+            );
+          } catch (e) {
+            if (!/message is not modified/i.test(String(e?.description || e))) {
+              try {
+                await ctx.reply(accumulated);
+              } catch (_) {}
+            }
+          }
+          ctx.session.messages.push({
+            role: roles.ASSISTANT,
+            content: accumulated,
+          });
+        } else {
+          // Fallback: no stream chunks arrived; perform non-stream request
+          try {
+            const fullText = await handleOpenAiRequest(ctx.session.messages);
+            if (fullText && fullText.trim().length > 0) {
+              try {
+                await ctx.telegram.editMessageText(
+                  ctx.chat.id,
+                  placeholder.message_id,
+                  undefined,
+                  fullText
+                );
+              } catch (e2) {
+                if (
+                  !/message is not modified/i.test(
+                    String(e2?.description || e2)
+                  )
+                ) {
+                  try {
+                    await ctx.reply(fullText);
+                  } catch (_) {}
+                }
+              }
+              ctx.session.messages.push({
+                role: roles.ASSISTANT,
+                content: fullText,
+              });
+            } else {
+              try {
+                await ctx.telegram.editMessageText(
+                  ctx.chat.id,
+                  placeholder.message_id,
+                  undefined,
+                  "Что-то я устал, надо поспать... Давай позже"
+                );
+              } catch (_) {}
+            }
+          } catch (_) {
+            try {
+              await ctx.telegram.editMessageText(
+                ctx.chat.id,
+                placeholder.message_id,
+                undefined,
+                "Что-то я устал, надо поспать... Давай позже"
+              );
+            } catch (_) {}
+          }
+        }
+      };
+
+      await streamOpenAiText(ctx.session.messages, {
+        onDelta: async (delta) => {
+          accumulated += delta;
+          const now = Date.now();
+          if (now - lastEditAt < 700) return; // throttle edits
+          lastEditAt = now;
+          try {
+            await ctx.telegram.editMessageText(
+              ctx.chat.id,
+              placeholder.message_id,
+              undefined,
+              accumulated
+            );
+          } catch (e) {
+            // Ignore collisions / unchanged content
+          }
+        },
+        onDone: async () => {
+          await tryFinalize();
+        },
+        onError: async () => {
+          await tryFinalize();
+        },
+      });
     }
   } catch (error) {
     await ctx.reply(`Ошибочка вышла: ${error.message}`);
   }
 };
 
-const realImage = async (ctx) => {
-  await checkSession(ctx);
-  await ctx.reply("Опиши детально что нарисовать как фото");
-  ctx.session.parametres.drawImage = true;
-  ctx.session.parametres.realImage = true;
-};
-
-const surrImage = async (ctx) => {
+// Единый режим рисования без выбора реализм/рисунок
+const drawImageStart = async (ctx) => {
   await checkSession(ctx);
   await ctx.reply("Опиши детально что нарисовать");
   ctx.session.parametres.drawImage = true;
-  ctx.session.parametres.realImage = false;
 };
 
 const selectVoice = async (ctx) => {
@@ -190,20 +284,31 @@ export function setupBotCommands(bot) {
   bot.hears(menu.menuRole, setRole);
   bot.hears(menu.menuBack, backMsg);
 
-  bot.hears(menu.menuImageImReal, realImage);
-  bot.hears(menu.menuImageImSurr, surrImage);
+  // Один пункт меню для рисования
+  bot.hears(menu.menuImage, drawImageStart);
 
   bot.hears(menu.menuSelectVoice, selectVoice);
   bot.hears(menu.menuSelectText, selectText);
 
   bot.hears(menu.menuVoiceMan, setMaleVoice);
   bot.hears(menu.menuVoiceWoman, setWomanVoice);
+  // removed dead handler for menuVoice (button is not present in main menu)
 
-  bot.hears(menu.menuImage, async (ctx) => {
-    await ctx.reply("Меню картинок:", menu.imageMenu);
-  });
-  bot.hears(menu.menuVoice, async (ctx) => {
-    await ctx.reply("Меню голоса:", menu.voiceMenu);
+  // Realtime mini-app open button
+  bot.hears(menu.menuRealtime, async (ctx) => {
+    await checkSession(ctx);
+    const baseUrl = (() => {
+      try {
+        const v = config.get("webapp.baseUrl");
+        if (typeof v === "string" && v.trim().length > 0) return v.trim();
+      } catch (_) {}
+      return "http://localhost:3000";
+    })();
+    const url = `${baseUrl}/`;
+    await ctx.reply(
+      "Открыть мини‑приложение Realtime",
+      menu.buildRealtimeInlineKeyboard(url)
+    );
   });
 
   // Обработка сообщений
@@ -213,7 +318,6 @@ export function setupBotCommands(bot) {
   });
 
   bot.on("message", async (ctx) => {
-    console.log(ctx.message.sticker);
     const userId = ctx.chat.id;
     try {
       if (ctx.message.voice) {

@@ -19,7 +19,7 @@ export const createOpenAiInstance = () => {
 // Helpers
 const toResponsesInput = (messages) => {
   // Convert legacy Chat Completions style messages to Responses API input
-  // Supports string content and multimodal array content [{type:'text'|'image_url', ...}]
+  // Use input part types supported by Responses API: 'input_text' and 'input_image'
   return messages.map((m) => {
     if (typeof m.content === "string") {
       return {
@@ -86,17 +86,53 @@ const extractTextFromResponse = (resp) => {
   return null;
 };
 
-const tryModelsInOrder = async (models, buildRequest) => {
+const isRetryableError = (error) => {
+  const status = error?.status ?? error?.code?.status;
+  if ([408, 409, 429, 500, 502, 503, 504].includes(status)) return true;
+  const message = String(error?.message || "");
+  if (/timeout|ETIMEDOUT|network|fetch failed|socket hang up/i.test(message)) {
+    return true;
+  }
+  const code = error?.code || error?.error?.code;
+  return code === "rate_limit_exceeded" || code === "overloaded";
+};
+
+const withTimeout = async (promise, ms, onAbort) => {
+  let timer;
+  try {
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        if (typeof onAbort === "function") {
+          try {
+            onAbort();
+          } catch (_) {}
+        }
+        reject(new Error(`Request timed out after ${ms}ms`));
+      }, ms);
+    });
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const tryModelsInOrder = async (models, buildRequest, timeoutMs = 30000) => {
   let lastError = null;
-  for (const model of models) {
+  for (let i = 0; i < models.length; i += 1) {
+    const model = models[i];
     try {
       const req = buildRequest(model);
-      const resp = await globalOpenAI.responses.create(req);
+      const resp = await withTimeout(
+        globalOpenAI.responses.create(req),
+        timeoutMs
+      );
       const text = extractTextFromResponse(resp);
       if (text) return { text, resp };
     } catch (e) {
       lastError = e;
-      // try next model
+      const canRetry = isRetryableError(e) && i < models.length - 1;
+      if (!canRetry) break;
+      // otherwise continue to next model
     }
   }
   if (lastError) throw lastError;
@@ -112,16 +148,22 @@ export const handleOpenAiRequest = async (messages) => {
         return undefined;
       }
     })();
-    const models = [preferred] || ["gpt-5", "gpt-4.1-mini", "gpt-4o-mini"];
-
-    console.log("Selected model:", models);
+    const defaultModel = preferred || "gpt-4o-mini";
+    // Only fall back to one alternative on transient errors
+    const models = [defaultModel, "gpt-4.1-mini"];
 
     const input = toResponsesInput(messages);
-    const { text } = await tryModelsInOrder(models, (model) => ({
-      model,
-      tools: [{ type: "web_search_preview" }],
-      input,
-    }));
+    const { text } = await tryModelsInOrder(
+      models,
+      (model) => ({
+        model,
+        // Web search adds noticeable latency; keep it off by default
+        input,
+        max_output_tokens: 800,
+      }),
+      30000
+    );
+    console.log(text);
     return text;
   } catch (e) {
     console.log("Error in GPT Responses API", e.message);
@@ -138,7 +180,7 @@ export const handleOpenAiRequestVoice = async (messages, maleVoice = true) => {
         return undefined;
       }
     })();
-    const models = [preferred || "gpt-5", "gpt-4.1-mini", "gpt-4o-mini"];
+    const models = [preferred || "gpt-4o-mini", "gpt-4.1-mini"];
 
     const input = toResponsesInput(messages);
     const { text } = await tryModelsInOrder(models, (model) => ({
@@ -175,17 +217,103 @@ export const handleOpenAiVoice = async (filepath) => {
 };
 
 export const createOpenAiImage = async (prompt, quality = false) => {
+  const resolveQualityForDalle3 = (q) => {
+    if (typeof q === "string") return q === "high" ? "hd" : "standard";
+    return q ? "hd" : "standard"; // boolean compatibility
+  };
+
   try {
     const response = await globalOpenAI.images.generate({
-      model: "gpt-image-1",
+      model: "dall-e-3",
       prompt,
       size: "1024x1024",
-      quality: quality ? "hd" : "standard",
+      quality: resolveQualityForDalle3(quality),
       n: 1,
     });
-    return response.data[0].url;
+    return response.data[0]?.url || response.data[0]?.b64_json || null;
   } catch (e) {
     console.log("Error in createOpenAiImage", e.message);
     return "Ошибка рисования";
+  }
+};
+
+// Streaming text responses for incremental UI updates
+export const streamOpenAiText = async (
+  messages,
+  { model: forcedModel, onDelta, onDone, onError, maxOutputTokens = 800 } = {}
+) => {
+  const preferred = (() => {
+    try {
+      return config.get("openai.model");
+    } catch (_) {
+      return undefined;
+    }
+  })();
+  const model = forcedModel || preferred || "gpt-4o-mini";
+  const input = toResponsesInput(messages);
+
+  try {
+    const stream = await globalOpenAI.responses.stream({
+      model,
+      input,
+      max_output_tokens: maxOutputTokens,
+    });
+
+    // Prefer high-level textDelta if available
+    if (typeof stream.on === "function") {
+      let finished = false;
+      const finish = (err) => {
+        if (finished) return;
+        finished = true;
+        try {
+          if (err) {
+            if (typeof onError === "function") onError(err);
+          } else if (typeof onDone === "function") {
+            onDone();
+          }
+        } catch (_) {}
+      };
+
+      // SDK may emit textDelta events
+      try {
+        stream.on("textDelta", (delta) => {
+          if (typeof onDelta === "function" && delta) onDelta(String(delta));
+        });
+      } catch (_) {}
+
+      // Fallback to low-level event feed
+      try {
+        stream.on("event", (event) => {
+          if (event?.type === "response.output_text.delta") {
+            const delta = event?.delta || event?.text || "";
+            if (typeof onDelta === "function" && delta) onDelta(String(delta));
+          }
+        });
+      } catch (_) {}
+
+      stream.on("end", () => finish());
+      stream.on("close", () => finish());
+      stream.on("finished", () => finish());
+      stream.on("error", (err) => finish(err));
+
+      // Wait for stream to complete
+      try {
+        await stream.done();
+      } catch (_) {
+        // done() may throw if already ended; ignore
+      }
+      return;
+    }
+
+    // If stream object doesn't support events, fallback to non-stream
+    const { text } = await tryModelsInOrder([model], (m) => ({
+      model: m,
+      input,
+      max_output_tokens: maxOutputTokens,
+    }));
+    if (typeof onDelta === "function" && text) onDelta(text);
+    if (typeof onDone === "function") onDone();
+  } catch (err) {
+    if (typeof onError === "function") onError(err);
   }
 };
