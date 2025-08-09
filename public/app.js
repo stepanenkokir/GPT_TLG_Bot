@@ -16,14 +16,45 @@ function setActiveUI(active) {
   micButton.classList.toggle("active-pulse", active);
 }
 
+function isRunningInTelegram() {
+  return (
+    typeof window !== "undefined" && window.Telegram && window.Telegram.WebApp
+  );
+}
+
+function getInitData() {
+  if (!isRunningInTelegram()) return "";
+  return window.Telegram.WebApp.initData || "";
+}
+
+function getUrlToken() {
+  try {
+    const url = new URL(window.location.href);
+    return url.searchParams.get("t");
+  } catch (_) {
+    return null;
+  }
+}
+
 async function fetchEphemeralKey() {
-  const r = await fetch("/session");
+  const initData = getInitData();
+  const token = getUrlToken();
+  const headers = { "x-telegram-init-data": initData };
+  if (token) headers["x-webapp-token"] = token;
+  const r = await fetch("/session", { headers });
   if (!r.ok) throw new Error(`Failed to fetch session: ${r.status}`);
   return r.json();
 }
 
 async function startRealtime() {
   if (pc) return;
+  if (!isRunningInTelegram()) {
+    throw new Error("Откройте мини‑приложение внутри Telegram");
+  }
+  try {
+    window.Telegram.WebApp.ready();
+    window.Telegram.WebApp.expand();
+  } catch (_) {}
   setStatus("Получение ключа...");
   const session = await fetchEphemeralKey();
 

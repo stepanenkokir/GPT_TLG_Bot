@@ -9,6 +9,7 @@ import {
 import { ogg } from "./ogg.js";
 import * as menu from "./tlgBotMenu.js";
 import config from "config";
+import { createHmac } from "crypto";
 
 const roles = {
   ASSISTANT: "assistant",
@@ -304,7 +305,16 @@ export function setupBotCommands(bot) {
       } catch (_) {}
       return "http://localhost:3000";
     })();
-    const url = `${baseUrl}/`;
+    const signWebToken = (payload) => {
+      const secret = config.get("telegramBot.token");
+      const exp = Math.floor(Date.now() / 1000) + 60; // 1 минута на открытие
+      const data = { ...payload, exp };
+      const body = Buffer.from(JSON.stringify(data)).toString("base64url");
+      const sig = createHmac("sha256", secret).update(body).digest("base64url");
+      return `${body}.${sig}`;
+    };
+    const token = signWebToken({ uid: ctx.from.id });
+    const url = `${baseUrl}/?t=${encodeURIComponent(token)}`;
     await ctx.reply(
       "Открыть мини‑приложение Realtime",
       menu.buildRealtimeInlineKeyboard(url)

@@ -35,4 +35,4 @@ export const voiceMenu = Markup.keyboard(voiceArr).resize();
 export const voiceTextMenu = Markup.keyboard(voiceArrText).resize();
 
 export const buildRealtimeInlineKeyboard = (url) =>
-  Markup.inlineKeyboard([[Markup.button.url("Открыть Realtime", url)]]);
+  Markup.inlineKeyboard([[Markup.button.webApp("Открыть Realtime", url)]]);

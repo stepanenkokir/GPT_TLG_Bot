@@ -3,7 +3,10 @@ import { Telegraf, session } from "telegraf";
 import config from "config";
 import { createOpenAiInstance } from "./script/openai.js";
 import { setupBotCommands } from "./script/telegramBot.js";
-import { checkAuthUserImproved } from "./middleware/checkAuthUser.js";
+import {
+  checkAuthUserImproved,
+  isUserAuthorized,
+} from "./middleware/checkAuthUser.js";
 import { createLogger, format, transports } from "winston";
 import JokeSender from "./script/jokeSender.js";
 import fs from "fs/promises";
@@ -12,6 +15,7 @@ import cors from "cors";
 import axios from "axios";
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
+import { createHmac } from "crypto";
 
 // Настройки конфигурации из config/default.json
 const botToken = config.get("telegramBot.token");
@@ -76,12 +80,118 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Serve static files from /public
+// Gate index page: allow only inside Telegram WebApp and authorized users
+app.get(["/", "/index.html"], (req, res) => {
+  // Prefer signed token from bot button (works before JS runs)
+  const t = req.query?.t;
+  const verifyWebTokenGate = (token) => {
+    if (!token) return null;
+    const [body, sig] = String(token).split(".");
+    if (!body || !sig) return null;
+    const expected = createHmac("sha256", botToken)
+      .update(body)
+      .digest("base64url");
+    if (expected !== sig) return null;
+    try {
+      const data = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+      if (
+        typeof data?.exp !== "number" ||
+        data.exp < Math.floor(Date.now() / 1000)
+      )
+        return null;
+      return data;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const tokenData = verifyWebTokenGate(t);
+  if (!tokenData || !tokenData.uid || !isUserAuthorized(tokenData.uid)) {
+    return res.status(401).send("Open this page from Telegram bot");
+  }
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// Serve static files from /public (assets)
 app.use(express.static(path.join(__dirname, "public")));
 
 // Issue ephemeral key for OpenAI Realtime
 app.get("/session", async (req, res) => {
   try {
+    // Validate Telegram WebApp initData and user authorization
+    const initData = req.header("x-telegram-init-data") || "";
+    const webToken = req.header("x-webapp-token") || "";
+    const botToken = config.get("telegramBot.token");
+
+    const verifyInitData = (raw) => {
+      if (!raw || typeof raw !== "string") return { ok: false };
+      const params = new URLSearchParams(raw);
+      const hash = params.get("hash");
+      if (!hash) return { ok: false };
+      // Build data_check_string
+      const pairs = [];
+      for (const [key, value] of params.entries()) {
+        if (key === "hash") continue;
+        pairs.push(`${key}=${value}`);
+      }
+      pairs.sort();
+      const dataCheckString = pairs.join("\n");
+      // secret_key = HMAC_SHA256("WebAppData", botToken)
+      const secretKey = createHmac("sha256", "WebAppData")
+        .update(botToken)
+        .digest();
+      const computed = createHmac("sha256", secretKey)
+        .update(dataCheckString)
+        .digest("hex");
+      if (computed !== hash) return { ok: false };
+      // Extract user
+      const userJson = params.get("user");
+      let userId = null;
+      if (userJson) {
+        try {
+          const user = JSON.parse(userJson);
+          userId = user?.id ?? null;
+        } catch (_) {}
+      }
+      return { ok: true, userId };
+    };
+
+    const verification = verifyInitData(initData);
+    // Optional extra token check from bot deep-link
+    const verifyWebToken = (t) => {
+      if (!t) return false;
+      const [body, sig] = t.split(".");
+      if (!body || !sig) return false;
+      const expected = createHmac("sha256", botToken)
+        .update(body)
+        .digest("base64url");
+      if (expected !== sig) return false;
+      try {
+        const data = JSON.parse(
+          Buffer.from(body, "base64url").toString("utf8")
+        );
+        if (
+          typeof data?.exp !== "number" ||
+          data.exp < Math.floor(Date.now() / 1000)
+        )
+          return false;
+        return data;
+      } catch (_) {
+        return false;
+      }
+    };
+
+    const tokenData = verifyWebToken(webToken);
+
+    const userIdToCheck = verification.userId || tokenData?.uid;
+    if (
+      !verification.ok ||
+      !userIdToCheck ||
+      !isUserAuthorized(userIdToCheck)
+    ) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const apiKey = config.get("openai.apiKey");
     const model = (() => {
       try {

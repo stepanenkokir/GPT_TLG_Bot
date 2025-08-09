@@ -57,3 +57,11 @@ export const checkAuthUserImproved = async (ctx, next) => {
     console.error("Ошибка при проверке авторизации пользователя:", err);
   }
 };
+
+export const isUserAuthorized = (userId) => {
+  try {
+    return authorizedUsers.includes(userId);
+  } catch (_) {
+    return false;
+  }
+};
