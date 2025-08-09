@@ -31,6 +31,10 @@ const ensureLogDir = async () => {
   } catch (_) {}
 };
 
+const testMode = config.has("webapp.TEST_MODE")
+  ? config.get("webapp.TEST_MODE")
+  : false;
+
 // Инициализация OpenAI
 createOpenAiInstance();
 
@@ -105,9 +109,11 @@ app.get(["/", "/index.html"], (req, res) => {
     }
   };
 
-  const tokenData = verifyWebTokenGate(t);
-  if (!tokenData || !tokenData.uid || !isUserAuthorized(tokenData.uid)) {
-    return res.status(401).send("Open this page from Telegram bot");
+  if (!testMode) {
+    const tokenData = verifyWebTokenGate(t);
+    if (!tokenData || !tokenData.uid || !isUserAuthorized(tokenData.uid)) {
+      return res.status(401).send("Open this page from Telegram bot");
+    }
   }
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
@@ -181,17 +187,18 @@ app.get("/session", async (req, res) => {
       }
     };
 
-    const tokenData = verifyWebToken(webToken);
+    if (!testMode) {
+      const tokenData = verifyWebToken(webToken);
 
-    const userIdToCheck = verification.userId || tokenData?.uid;
-    if (
-      !verification.ok ||
-      !userIdToCheck ||
-      !isUserAuthorized(userIdToCheck)
-    ) {
-      return res.status(401).json({ error: "Unauthorized" });
+      const userIdToCheck = verification.userId || tokenData?.uid;
+      if (
+        !verification.ok ||
+        !userIdToCheck ||
+        !isUserAuthorized(userIdToCheck)
+      ) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
     }
-
     const apiKey = config.get("openai.apiKey");
     const model = (() => {
       try {
@@ -208,9 +215,25 @@ app.get("/session", async (req, res) => {
       }
     })();
 
+    const roleInstruction = (() => {
+      try {
+        return config.get("openai.ROLE");
+      } catch (_) {
+        return "Ты голосовой помощник Дилан. Отвечай кратко и дружелюбно на русском языке.";
+      }
+    })();
+
+    const voiceInstruction = (() => {
+      try {
+        return config.get("openai.VOICE");
+      } catch (_) {
+        return "Speak with a natural, conversational tone, incorporating light humor and subtle sarcasm where appropriate. Avoid sounding robotic or overly formal. Use varied intonation to convey personality and engage users effectively.";
+      }
+    })();
+
     const response = await axios.post(
       "https://api.openai.com/v1/realtime/sessions",
-      { model, voice },
+      { model, voice, instructions: roleInstruction + voiceInstruction },
       {
         headers: {
           Authorization: `Bearer ${apiKey}`,
