@@ -36,15 +36,7 @@ function getUrlToken() {
   }
 }
 
-async function fetchEphemeralKey() {
-  const initData = getInitData();
-  const token = getUrlToken();
-  const headers = { "x-telegram-init-data": initData };
-  if (token) headers["x-webapp-token"] = token;
-  const r = await fetch("/session", { headers });
-  if (!r.ok) throw new Error(`Failed to fetch session: ${r.status}`);
-  return r.json();
-}
+// All OpenAI communication is proxied by the server; no keys on client
 
 async function startRealtime() {
   if (pc) return;
@@ -55,8 +47,7 @@ async function startRealtime() {
     window.Telegram.WebApp.ready();
     window.Telegram.WebApp.expand();
   } catch (_) {}
-  setStatus("Получение ключа...");
-  const session = await fetchEphemeralKey();
+  setStatus("Подготовка соединения...");
 
   setStatus("Инициализация WebRTC...");
   pc = new RTCPeerConnection();
@@ -109,18 +100,13 @@ async function startRealtime() {
   await pc.setLocalDescription(offer);
 
   setStatus("Создание SDP...");
-  const baseUrl = `https://api.openai.com/v1/realtime?model=${encodeURIComponent(
-    session.model || "gpt-4o-realtime-preview-2025-06-03"
-  )}`;
-  const url = new URL(baseUrl);
-
-  const sdpResponse = await fetch(url, {
+  const sdpResponse = await fetch(`/realtime/sdp`, {
     method: "POST",
     body: offer.sdp,
     headers: {
-      Authorization: `Bearer ${session.client_secret?.value}`,
       "Content-Type": "application/sdp",
-      "OpenAI-Beta": "realtime=v1",
+      "x-telegram-init-data": getInitData(),
+      "x-webapp-token": getUrlToken() || "",
     },
   });
 

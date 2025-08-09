@@ -4,7 +4,6 @@ import {
   handleOpenAiRequest,
   handleOpenAiVoice,
   handleOpenAiRequestVoice,
-  streamOpenAiText,
 } from "./openai.js";
 import { ogg } from "./ogg.js";
 import * as menu from "./tlgBotMenu.js";
@@ -88,11 +87,14 @@ const textHandler = async (ctx, userMessage) => {
       await ctx.telegram.sendChatAction(ctx.chat.id, "upload_photo");
       const response = await createOpenAiImage(userMessage);
       ctx.session.parametres.drawImage = false;
-      // Если пришёл валидный URL от генерации — отправляем как фото, иначе текст
-      if (response && /^https?:\/\//i.test(response)) {
-        await ctx.replyWithPhoto(response);
+      const imageUrl = response?.url || null;
+      if (imageUrl && /^https?:\/\//i.test(imageUrl)) {
+        await ctx.replyWithPhoto(imageUrl);
       } else {
-        await ctx.reply(response || "Не удалось получить изображение");
+        const errorText = response?.error
+          ? `Не удалось получить изображение: ${response.error}`
+          : "Не удалось получить изображение";
+        await ctx.reply(errorText);
       }
       return;
     }
@@ -115,118 +117,25 @@ const textHandler = async (ctx, userMessage) => {
         await ctx.reply("Что-то я устал, надо поспать... Давай позже");
       }
     } else {
-      // Streaming text reply with live edits
+      // Simple text reply with typing action
       await ctx.telegram.sendChatAction(ctx.chat.id, "typing");
       ctx.session.messages.push({ role: roles.USER, content: userMessage });
 
-      // Placeholder message that we continuously edit
-      const placeholder = await ctx.reply("Печатаю ответ…");
+      const { text, error } = await handleOpenAiRequest(ctx.session.messages);
 
-      let accumulated = "";
-      let lastEditAt = 0;
-      let typingTimer = setInterval(() => {
-        ctx.telegram.sendChatAction(ctx.chat.id, "typing").catch(() => {});
-      }, 1000);
-
-      let finalized = false;
-      const tryFinalize = async () => {
-        if (finalized) return;
-        finalized = true;
-        clearInterval(typingTimer);
-        if (accumulated.trim().length > 0) {
-          // Final update with full text (guard against identical content)
-          try {
-            await ctx.telegram.editMessageText(
-              ctx.chat.id,
-              placeholder.message_id,
-              undefined,
-              accumulated
-            );
-          } catch (e) {
-            if (!/message is not modified/i.test(String(e?.description || e))) {
-              try {
-                await ctx.reply(accumulated);
-              } catch (_) {}
-            }
-          }
-          ctx.session.messages.push({
-            role: roles.ASSISTANT,
-            content: accumulated,
-          });
-        } else {
-          // Fallback: no stream chunks arrived; perform non-stream request
-          try {
-            const fullText = await handleOpenAiRequest(ctx.session.messages);
-            if (fullText && fullText.trim().length > 0) {
-              try {
-                await ctx.telegram.editMessageText(
-                  ctx.chat.id,
-                  placeholder.message_id,
-                  undefined,
-                  fullText
-                );
-              } catch (e2) {
-                if (
-                  !/message is not modified/i.test(
-                    String(e2?.description || e2)
-                  )
-                ) {
-                  try {
-                    await ctx.reply(fullText);
-                  } catch (_) {}
-                }
-              }
-              ctx.session.messages.push({
-                role: roles.ASSISTANT,
-                content: fullText,
-              });
-            } else {
-              try {
-                await ctx.telegram.editMessageText(
-                  ctx.chat.id,
-                  placeholder.message_id,
-                  undefined,
-                  "Что-то я устал, надо поспать... Давай позже"
-                );
-              } catch (_) {}
-            }
-          } catch (_) {
-            try {
-              await ctx.telegram.editMessageText(
-                ctx.chat.id,
-                placeholder.message_id,
-                undefined,
-                "Что-то я устал, надо поспать... Давай позже"
-              );
-            } catch (_) {}
-          }
-        }
-      };
-
-      await streamOpenAiText(ctx.session.messages, {
-        onDelta: async (delta) => {
-          accumulated += delta;
-          const now = Date.now();
-          if (now - lastEditAt < 700) return; // throttle edits
-          lastEditAt = now;
-          try {
-            await ctx.telegram.editMessageText(
-              ctx.chat.id,
-              placeholder.message_id,
-              undefined,
-              accumulated
-            );
-          } catch (e) {
-            // Ignore collisions / unchanged content
-          }
-        },
-        onDone: async () => {
-          await tryFinalize();
-        },
-        onError: async () => {
-          await tryFinalize();
-        },
-      });
+      if (error) {
+        await ctx.reply(`Ошибочка вышла: ${error}`);
+      } else if (text && text.trim().length > 0) {
+        ctx.session.messages.push({
+          role: roles.ASSISTANT,
+          content: text,
+        });
+        await ctx.reply(text);
+      } else {
+        await ctx.reply(
+          "Что-то я устал, надо поспать... Давай попробуем позже"
+        );
+      }
     }
   } catch (error) {
     await ctx.reply(`Ошибочка вышла: ${error.message}`);
@@ -360,8 +269,12 @@ export function setupBotCommands(bot) {
             { type: "image_url", image_url: { url: photoUrl.href } },
           ],
         });
-        const response = await handleOpenAiRequest(ctx.session.messages);
-        await ctx.reply(response);
+        const { text: photoResp, error: photoErr } = await handleOpenAiRequest(
+          ctx.session.messages
+        );
+        await ctx.reply(
+          photoErr ? `Ошибка: ${photoErr}` : photoResp || "Пустой ответ"
+        );
       }
     } catch (error) {
       console.log("Error message where bot.message ", error.message);

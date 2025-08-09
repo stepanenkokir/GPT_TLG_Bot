@@ -8,312 +8,184 @@ import { createReadStream } from "fs";
 let globalOpenAI = null;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const speechDir = resolve(__dirname, "../voices");
+const speechFile = resolve(speechDir, "speech.mp3");
 
-const speechFile = resolve(__dirname, "../voices", "speach.mp3");
-
+// ===== Инициализация =====
 export const createOpenAiInstance = () => {
+  if (globalOpenAI) return;
   const openAiApiKey = config.get("openai.apiKey");
+  if (!openAiApiKey) throw new Error("OpenAI API key is missing in config");
   globalOpenAI = new OpenAI({ apiKey: openAiApiKey });
 };
 
-// Helpers
-const toResponsesInput = (messages) => {
-  // Convert legacy Chat Completions style messages to Responses API input
-  // Use input part types supported by Responses API: 'input_text' and 'input_image'
-  return messages.map((m) => {
-    if (typeof m.content === "string") {
-      return {
-        role: m.role,
-        content: [{ type: "input_text", text: m.content }],
-      };
-    }
-    if (Array.isArray(m.content)) {
-      return {
-        role: m.role,
-        content: m.content.map((part) => {
-          if (part.type === "text") {
-            return { type: "input_text", text: part.text };
-          }
-          if (part.type === "image_url") {
-            return {
-              type: "input_image",
-              image_url: part.image_url.url || part.image_url,
-            };
-          }
-          // Fallback: stringify unknown parts as text
-          return {
-            type: "input_text",
-            text: typeof part === "string" ? part : JSON.stringify(part),
-          };
-        }),
-      };
-    }
-    return {
-      role: m.role,
-      content: [{ type: "input_text", text: String(m.content) }],
-    };
-  });
+// ===== Вспомогательные =====
+const getModel = () => {
+  try {
+    const m = config.get("openai.model");
+    return typeof m === "string" && m.trim() ? m.trim() : "gpt-4o-mini";
+  } catch {
+    return "gpt-4o-mini";
+  }
 };
 
-const extractTextFromResponse = (resp) => {
-  // SDK v4 exposes convenient output_text; fallback to walking the output structure
-  if (
-    resp &&
-    typeof resp.output_text === "string" &&
-    resp.output_text.length > 0
-  ) {
-    return resp.output_text;
-  }
-  try {
-    const blocks = resp?.output ?? resp?.response?.output;
-    if (!Array.isArray(blocks)) return null;
-    // Find the first text block
-    for (const block of blocks) {
-      const content = block?.content;
-      if (!Array.isArray(content)) continue;
-      for (const item of content) {
-        if (item?.type === "output_text" && typeof item?.text === "string") {
-          return item.text;
-        }
-        if (item?.type === "text" && typeof item?.text === "string") {
-          return item.text;
-        }
+const toChatMessages = (messages) =>
+  messages
+    .filter((m) => m && m.role)
+    .map((m) => {
+      if (typeof m.content === "string") {
+        return {
+          role: m.role,
+          content: m.content,
+        };
       }
-    }
-  } catch (_) {
-    // ignore
+      if (Array.isArray(m.content)) {
+        return {
+          role: m.role,
+          content: m.content.map((part) => {
+            if (part?.type === "text") {
+              return { type: "text", text: part.text };
+            }
+            if (part?.type === "image_url") {
+              return {
+                type: "image_url",
+                image_url: part.image_url?.url || part.image_url,
+              };
+            }
+            return {
+              type: "text",
+              text: typeof part === "string" ? part : JSON.stringify(part),
+            };
+          }),
+        };
+      }
+      return {
+        role: m.role,
+        content: String(m.content),
+      };
+    });
+
+const extractTextFromResponse = (resp) => {
+  if (!resp) return "";
+
+  // Стандартный Chat Completions ответ
+  if (resp.choices && resp.choices[0]?.message?.content) {
+    return String(resp.choices[0].message.content).trim();
   }
-  return null;
+
+  // Фоллбэк для других форматов
+  if (resp.output_text) {
+    return Array.isArray(resp.output_text)
+      ? resp.output_text.join("").trim()
+      : String(resp.output_text).trim();
+  }
+
+  return "";
 };
 
 const isRetryableError = (error) => {
-  const status = error?.status ?? error?.code?.status;
+  const status = error?.status;
   if ([408, 409, 429, 500, 502, 503, 504].includes(status)) return true;
   const message = String(error?.message || "");
-  if (/timeout|ETIMEDOUT|network|fetch failed|socket hang up/i.test(message)) {
-    return true;
-  }
-  const code = error?.code || error?.error?.code;
-  return code === "rate_limit_exceeded" || code === "overloaded";
+  return /timeout|ETIMEDOUT|network|fetch failed|socket hang up/i.test(message);
 };
 
-const withTimeout = async (promise, ms, onAbort) => {
-  let timer;
-  try {
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => {
-        if (typeof onAbort === "function") {
-          try {
-            onAbort();
-          } catch (_) {}
-        }
-        reject(new Error(`Request timed out after ${ms}ms`));
-      }, ms);
-    });
-    return await Promise.race([promise, timeout]);
-  } finally {
-    clearTimeout(timer);
-  }
-};
-
-const tryModelsInOrder = async (models, buildRequest, timeoutMs = 30000) => {
-  let lastError = null;
-  for (let i = 0; i < models.length; i += 1) {
-    const model = models[i];
+// Универсальный запрос с ретраем
+const requestWithRetry = async (fn, retries = 2) => {
+  let lastErr;
+  for (let i = 0; i <= retries; i++) {
     try {
-      const req = buildRequest(model);
-      const resp = await withTimeout(
-        globalOpenAI.responses.create(req),
-        timeoutMs
-      );
-      const text = extractTextFromResponse(resp);
-      if (text) return { text, resp };
-    } catch (e) {
-      lastError = e;
-      const canRetry = isRetryableError(e) && i < models.length - 1;
-      if (!canRetry) break;
-      // otherwise continue to next model
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isRetryableError(err) || i === retries) throw err;
     }
   }
-  if (lastError) throw lastError;
-  return { text: null, resp: null };
+  throw lastErr;
 };
 
+// ===== Основные методы =====
 export const handleOpenAiRequest = async (messages) => {
   try {
-    const preferred = (() => {
-      try {
-        return config.get("openai.model");
-      } catch (_) {
-        return undefined;
-      }
-    })();
-    const defaultModel = preferred || "gpt-4o-mini";
-    // Only fall back to one alternative on transient errors
-    const models = [defaultModel, "gpt-4.1-mini"];
+    const model = getModel();
+    const chatMessages = toChatMessages(messages);
 
-    const input = toResponsesInput(messages);
-    const { text } = await tryModelsInOrder(
-      models,
-      (model) => ({
+    const resp = await requestWithRetry(() =>
+      globalOpenAI.chat.completions.create({
         model,
-        // Web search adds noticeable latency; keep it off by default
-        input,
-        max_output_tokens: 800,
-      }),
-      30000
+        messages: chatMessages,
+        max_completion_tokens: 2000,
+      })
     );
-    console.log(text);
-    return text;
+
+    return { text: extractTextFromResponse(resp) };
   } catch (e) {
-    console.log("Error in GPT Responses API", e.message);
-    return "Ошибка открытия чата";
+    console.error("Error in GPT Chat Completions API:", e);
+    return { text: "", error: e.message };
   }
 };
 
 export const handleOpenAiRequestVoice = async (messages, maleVoice = true) => {
   try {
-    const preferred = (() => {
-      try {
-        return config.get("openai.model");
-      } catch (_) {
-        return undefined;
-      }
-    })();
-    const models = [preferred || "gpt-4o-mini", "gpt-4.1-mini"];
+    await fs.promises.mkdir(speechDir, { recursive: true });
 
-    const input = toResponsesInput(messages);
-    const { text } = await tryModelsInOrder(models, (model) => ({
-      model,
-      input,
-    }));
+    const { text, error } = await handleOpenAiRequest(messages);
+    if (error) return { text, error };
 
     const mp3 = await globalOpenAI.audio.speech.create({
       model: "tts-1",
       voice: maleVoice ? "alloy" : "nova",
       input: text,
     });
+
     const buffer = Buffer.from(await mp3.arrayBuffer());
     await fs.promises.writeFile(speechFile, buffer);
 
     return { text, buffer };
   } catch (e) {
-    console.log("Error in GPT VOICE API", e.message);
-    return { content: "Ошибка открытия чата" };
+    console.error("Error in GPT VOICE API:", e);
+    return { text: "", error: e.message };
   }
 };
 
 export const handleOpenAiVoice = async (filepath) => {
   try {
-    const response = await globalOpenAI.audio.transcriptions.create({
-      model: "whisper-1",
-      file: createReadStream(filepath),
-    });
-    return response.text;
+    const resp = await requestWithRetry(() =>
+      globalOpenAI.audio.transcriptions.create({
+        model: "whisper-1",
+        file: createReadStream(filepath),
+      })
+    );
+    return { text: resp.text };
   } catch (e) {
-    console.log("Error in transcription", e.message);
-    return "Ошибка распознавания текста";
+    console.error("Error in transcription:", e);
+    return { text: "", error: e.message };
   }
 };
 
 export const createOpenAiImage = async (prompt, quality = false) => {
-  const resolveQualityForDalle3 = (q) => {
-    if (typeof q === "string") return q === "high" ? "hd" : "standard";
-    return q ? "hd" : "standard"; // boolean compatibility
-  };
+  const resolveQuality = (q) =>
+    typeof q === "string"
+      ? q === "high"
+        ? "hd"
+        : "standard"
+      : q
+      ? "hd"
+      : "standard";
 
   try {
-    const response = await globalOpenAI.images.generate({
-      model: "dall-e-3",
-      prompt,
-      size: "1024x1024",
-      quality: resolveQualityForDalle3(quality),
-      n: 1,
-    });
-    return response.data[0]?.url || response.data[0]?.b64_json || null;
+    const resp = await requestWithRetry(() =>
+      globalOpenAI.images.generate({
+        model: "dall-e-3",
+        prompt,
+        size: "1024x1024",
+        quality: resolveQuality(quality),
+        n: 1,
+      })
+    );
+    return { url: resp.data?.[0]?.url || null };
   } catch (e) {
-    console.log("Error in createOpenAiImage", e.message);
-    return "Ошибка рисования";
-  }
-};
-
-// Streaming text responses for incremental UI updates
-export const streamOpenAiText = async (
-  messages,
-  { model: forcedModel, onDelta, onDone, onError, maxOutputTokens = 800 } = {}
-) => {
-  const preferred = (() => {
-    try {
-      return config.get("openai.model");
-    } catch (_) {
-      return undefined;
-    }
-  })();
-  const model = forcedModel || preferred || "gpt-4o-mini";
-  const input = toResponsesInput(messages);
-
-  try {
-    const stream = await globalOpenAI.responses.stream({
-      model,
-      input,
-      max_output_tokens: maxOutputTokens,
-    });
-
-    // Prefer high-level textDelta if available
-    if (typeof stream.on === "function") {
-      let finished = false;
-      const finish = (err) => {
-        if (finished) return;
-        finished = true;
-        try {
-          if (err) {
-            if (typeof onError === "function") onError(err);
-          } else if (typeof onDone === "function") {
-            onDone();
-          }
-        } catch (_) {}
-      };
-
-      // SDK may emit textDelta events
-      try {
-        stream.on("textDelta", (delta) => {
-          if (typeof onDelta === "function" && delta) onDelta(String(delta));
-        });
-      } catch (_) {}
-
-      // Fallback to low-level event feed
-      try {
-        stream.on("event", (event) => {
-          if (event?.type === "response.output_text.delta") {
-            const delta = event?.delta || event?.text || "";
-            if (typeof onDelta === "function" && delta) onDelta(String(delta));
-          }
-        });
-      } catch (_) {}
-
-      stream.on("end", () => finish());
-      stream.on("close", () => finish());
-      stream.on("finished", () => finish());
-      stream.on("error", (err) => finish(err));
-
-      // Wait for stream to complete
-      try {
-        await stream.done();
-      } catch (_) {
-        // done() may throw if already ended; ignore
-      }
-      return;
-    }
-
-    // If stream object doesn't support events, fallback to non-stream
-    const { text } = await tryModelsInOrder([model], (m) => ({
-      model: m,
-      input,
-      max_output_tokens: maxOutputTokens,
-    }));
-    if (typeof onDelta === "function" && text) onDelta(text);
-    if (typeof onDone === "function") onDone();
-  } catch (err) {
-    if (typeof onError === "function") onError(err);
+    console.error("Error in createOpenAiImage:", e);
+    return { url: null, error: e.message };
   }
 };
