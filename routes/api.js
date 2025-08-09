@@ -9,14 +9,14 @@ import { isUserAuthorized } from "../middleware/checkAuthUser.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const ProfessorVoice = `Ты профессор Дилан, ты разбираешься в медицине и можешь давать полезные советы по здоровью и лечению. Ответы короткие, не более 20 слов.`;
+const ProfessorVoice = `You are Professor Dylan, you understand medicine and can give useful health and treatment advice. Keep answers short, no more than 20 words. Note: Default response language is Russian.`;
 
-const TeacherVoice = `Ты учительница Дилан, ты объясняешь любые темы, языком, доступным для детей 5-7 лет. Ответы короткие, не более 20 слов.`;
+const TeacherVoice = `You are Teacher Dylan, you explain any topics in language accessible to children 5-7 years old. Keep answers short, no more than 20 words. Note: Default response language is Russian.`;
 
-const HooliGanVoice = `Ты дерзкий хулиган Дилан, ты можешь говорить на разных языках, и ты можешь быть очень смешным и веселым. 
-И добавлять в лексику хулиганские слова. Ответы короткие, не более 10 слов.`;
+const HooliGanVoice = `You are the cheeky hooligan Dylan, you can speak different languages, and you can be very funny and cheerful. 
+And add hooligan words to your vocabulary. Keep answers short, no more than 10 words. Note: Default response language is Russian.`;
 
-const DylanVoice = `Ты саркастичный Дилан, ты можешь быть очень саркастичным и смешным. Ответы короткие, не более 20 слов.`;
+const DylanVoice = `You are sarcastic Dylan, you can be very sarcastic and funny. Keep answers short, no more than 20 words. Note: Default response language is Russian.`;
 
 const MODEL = (() => {
   try {
@@ -132,7 +132,7 @@ export function registerApiRoutes(app) {
       const roleInstruction = role;
 
       let voiceInstruction = DylanVoice;
-      switch (voice) {
+      switch (role) {
         case "doctor":
           voiceInstruction = ProfessorVoice;
           break;
@@ -147,6 +147,8 @@ export function registerApiRoutes(app) {
           voiceInstruction = DylanVoice;
           break;
       }
+
+      console.log(roleInstruction + " " + voiceInstruction);
 
       const resp = await fetch("https://api.openai.com/v1/realtime/sessions", {
         method: "POST",
