@@ -7,6 +7,7 @@ let micStream = null;
 let remoteAudioEl = null;
 let dataChannel = null;
 let isActive = false;
+let isStopping = false;
 let selectedRole = "default";
 
 // Role configurations
@@ -326,6 +327,14 @@ function getUrlToken() {
   }
 }
 
+function isIOS() {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
 function setButtonState(state) {
   micButton.classList.remove("recording", "playing");
   if (state) micButton.classList.add(state);
@@ -597,16 +606,31 @@ async function startRealtime() {
 }
 
 async function stopRealtime() {
+  if (isStopping) return;
+  isStopping = true;
   console.log("stopRealtime");
   setButtonState(null);
 
   try {
+    isActive = false;
+    setActiveUI(false);
     if (dataChannel && dataChannel.readyState !== "closed") {
       try {
         dataChannel.close();
       } catch (_) {}
     }
     if (pc) {
+      // Try to detach and stop tracks before closing pc (iOS is picky)
+      try {
+        pc.getSenders().forEach((sender) => {
+          try {
+            if (sender.track) sender.track.stop();
+          } catch (_) {}
+          try {
+            pc.removeTrack(sender);
+          } catch (_) {}
+        });
+      } catch (_) {}
       pc.getSenders().forEach((s) => {
         try {
           s.track && s.track.stop();
@@ -625,10 +649,24 @@ async function stopRealtime() {
     }
     if (remoteAudioEl) {
       try {
+        remoteAudioEl.pause && remoteAudioEl.pause();
+      } catch (_) {}
+      try {
         remoteAudioEl.srcObject = null;
       } catch (_) {}
       try {
+        remoteAudioEl.removeAttribute &&
+          remoteAudioEl.removeAttribute("srcObject");
+      } catch (_) {}
+      try {
         remoteAudioEl.remove();
+      } catch (_) {}
+    }
+    // iOS sometimes keeps the AVAudioSession locked; open/close a dummy stream to release it
+    if (isIOS()) {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+        s.getTracks().forEach((t) => t.stop());
       } catch (_) {}
     }
   } finally {
@@ -637,15 +675,7 @@ async function stopRealtime() {
     dataChannel = null;
     remoteAudioEl = null;
     setStatus("Отключено");
-
-    // iOS-specific: Deactivate audio session and restore Telegram's audio
-    if (isIOS()) {
-      await iosAudioManager.deactivateAudioSession();
-      // Show option to restore Telegram audio session
-      setTimeout(() => {
-        iosAudioManager.restoreTelegramAudioSession();
-      }, 500);
-    }
+    isStopping = false;
   }
 }
 
@@ -739,8 +769,6 @@ roleSelect.addEventListener("change", updateRoleSelection);
 
 micButton.addEventListener("click", async () => {
   if (isActive) {
-    setActiveUI(false);
-    isActive = false;
     await stopRealtime();
     return;
   }
@@ -751,13 +779,7 @@ micButton.addEventListener("click", async () => {
     await startRealtime();
   } catch (e) {
     console.error(e);
-
-    // iOS-specific error handling
-    const enhancedError = handleIOSAudioError(e);
-
-    setActiveUI(false);
-    isActive = false;
-    setStatus(`Ошибка: ${enhancedError.message}`);
+    setStatus(`Ошибка: ${e.message}`);
     await stopRealtime();
   }
 });
@@ -821,52 +843,36 @@ if (isIOS()) {
 // Initialize role selection
 updateRoleSelection();
 
-// Show iOS fix button for iOS devices
-if (isIOS()) {
-  const iosFixDiv = document.getElementById("iosFix");
-  if (iosFixDiv) {
-    iosFixDiv.style.display = "block";
+// Ensure we release the microphone when the webview goes to background or closes
+function cleanupOnHideOrClose() {
+  if (isActive || pc || micStream) {
+    stopRealtime();
   }
 }
 
-// Add event listener for fix microphone button
-const fixMicrophoneBtn = document.getElementById("fixMicrophoneBtn");
-if (fixMicrophoneBtn) {
-  fixMicrophoneBtn.addEventListener("click", async () => {
-    try {
-      fixMicrophoneBtn.disabled = true;
-      fixMicrophoneBtn.textContent = "🔧 Восстанавливаю...";
+// Page lifecycle hooks (important for iOS)
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    cleanupOnHideOrClose();
+  }
+});
 
-      // Force deactivate any active audio session
-      await iosAudioManager.deactivateAudioSession();
+// pagehide is more reliable on iOS/Safari than beforeunload
+window.addEventListener("pagehide", () => {
+  cleanupOnHideOrClose();
+});
 
-      // Force iOS to restore default audio session
-      await iosAudioManager.forceIOSAudioSessionRelease();
+// As a last resort
+window.addEventListener("beforeunload", () => {
+  cleanupOnHideOrClose();
+});
 
-      // Show success message
-      fixMicrophoneBtn.textContent = "✅ Готово!";
-      fixMicrophoneBtn.style.background =
-        "linear-gradient(135deg, #28a745, #20c997)";
-
-      // Reset button after delay
-      setTimeout(() => {
-        fixMicrophoneBtn.disabled = false;
-        fixMicrophoneBtn.textContent = "🔧 Восстановить микрофон в Telegram";
-        fixMicrophoneBtn.style.background =
-          "linear-gradient(135deg, #ff4d6d, #ff6b8a)";
-      }, 3000);
-    } catch (error) {
-      console.error("Failed to fix microphone:", error);
-      fixMicrophoneBtn.textContent = "❌ Ошибка";
-      fixMicrophoneBtn.style.background =
-        "linear-gradient(135deg, #dc3545, #c82333)";
-
-      setTimeout(() => {
-        fixMicrophoneBtn.disabled = false;
-        fixMicrophoneBtn.textContent = "🔧 Восстановить микрофон в Telegram";
-        fixMicrophoneBtn.style.background =
-          "linear-gradient(135deg, #ff4d6d, #ff6b8a)";
-      }, 3000);
-    }
-  });
-}
+// Telegram-specific hooks
+try {
+  if (isRunningInTelegram()) {
+    // Stop session when user taps back button in Telegram
+    window.Telegram.WebApp.onEvent("backButtonClicked", () => {
+      cleanupOnHideOrClose();
+    });
+  }
+} catch (_) {}
