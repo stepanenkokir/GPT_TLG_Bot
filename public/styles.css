@@ -220,3 +220,77 @@ h1 {
     height: 56px;
   }
 }
+
+/* iOS-specific styles */
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari specific styles */
+  body {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #micButton {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+
+  /* iOS Safari audio element fixes */
+  audio {
+    -webkit-playsinline: true;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* iOS Safari specific media queries */
+@media screen and (-webkit-min-device-pixel-ratio: 2) and (max-width: 480px) {
+  /* iPhone retina display optimizations */
+  #micButton {
+    width: 140px;
+    height: 140px;
+  }
+
+  #micButton .dot {
+    width: 56px;
+    height: 56px;
+  }
+
+  .role-selector {
+    top: env(safe-area-inset-top, 15px);
+    left: env(safe-area-inset-left, 15px);
+  }
+}
+
+/* iOS safe area support */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+    padding-top: max(0px, env(safe-area-inset-top));
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+  }
+
+  #app {
+    padding-left: max(24px, env(safe-area-inset-left) + 24px);
+    padding-right: max(24px, env(safe-area-inset-right) + 24px);
+    padding-top: max(24px, env(safe-area-inset-top) + 24px);
+    padding-bottom: max(24px, env(safe-area-inset-bottom) + 24px);
+  }
+}
+
+/* iOS Safari specific button states */
+@supports (-webkit-touch-callout: none) {
+  #micButton:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+
+  #micButton:active .dot {
+    transform: scale(0.9);
+    transition: transform 0.1s ease;
+  }
+}
