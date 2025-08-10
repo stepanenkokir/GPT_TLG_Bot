@@ -220,3 +220,195 @@ h1 {
     height: 56px;
   }
 }
+
+/* iOS-specific styles */
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari specific styles */
+  body {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #micButton {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+
+  /* iOS Safari audio element fixes */
+  audio {
+    -webkit-playsinline: true;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* iOS Safari specific media queries */
+@media screen and (-webkit-min-device-pixel-ratio: 2) and (max-width: 480px) {
+  /* iPhone retina display optimizations */
+  #micButton {
+    width: 140px;
+    height: 140px;
+  }
+
+  #micButton .dot {
+    width: 56px;
+    height: 56px;
+  }
+
+  .role-selector {
+    top: env(safe-area-inset-top, 15px);
+    left: env(safe-area-inset-left, 15px);
+  }
+}
+
+/* iOS safe area support */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+    padding-top: max(0px, env(safe-area-inset-top));
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+  }
+
+  #app {
+    padding-left: max(24px, env(safe-area-inset-left) + 24px);
+    padding-right: max(24px, env(safe-area-inset-right) + 24px);
+    padding-top: max(24px, env(safe-area-inset-top) + 24px);
+    padding-bottom: max(24px, env(safe-area-inset-bottom) + 24px);
+  }
+}
+
+/* iOS Safari specific button states */
+@supports (-webkit-touch-callout: none) {
+  #micButton:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+
+  #micButton:active .dot {
+    transform: scale(0.9);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* iOS Microphone Fix Button Styles */
+.ios-fix {
+  margin-top: 16px;
+  text-align: center;
+  padding: 16px;
+  background: rgba(255, 77, 109, 0.1);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 77, 109, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.fix-btn {
+  background: linear-gradient(135deg, #ff4d6d, #ff6b8a);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(255, 77, 109, 0.3);
+  font-family: inherit;
+}
+
+.fix-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(255, 77, 109, 0.4);
+}
+
+.fix-btn:active {
+  transform: translateY(0);
+}
+
+.fix-hint {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* iOS-specific fix button styles */
+@supports (-webkit-touch-callout: none) {
+  .fix-btn {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+
+  .fix-btn:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* Telegram Restore Notification Styles */
+.telegram-restore-notification .notification-content {
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(110, 168, 254, 0.2);
+}
+
+.telegram-restore-notification h3 {
+  margin: 0 0 16px 0;
+  color: var(--accent);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.telegram-restore-notification p {
+  margin: 0 0 16px 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.telegram-restore-notification ol {
+  margin: 0 0 20px 0;
+  padding-left: 20px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.telegram-restore-notification li {
+  margin-bottom: 8px;
+}
+
+.notification-close {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  width: 100%;
+}
+
+.notification-close:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(110, 168, 254, 0.3);
+}
+
+.notification-close:active {
+  transform: translateY(0);
+}

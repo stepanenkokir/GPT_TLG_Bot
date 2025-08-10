@@ -246,7 +246,7 @@ export function setupBotCommands(bot) {
         );
         const oggPath = await ogg.create(oggLink.href, userId, "ogg");
         const mp3Path = await ogg.toMP3(oggPath, userId);
-        const text = await handleOpenAiVoice(mp3Path);
+        const { text } = await handleOpenAiVoice(mp3Path);
         await textHandler(ctx, text);
       }
 

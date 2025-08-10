@@ -2,7 +2,18 @@
 <html lang="ru">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Говорилка" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="msapplication-tap-highlight" content="no" />
     <title>Realtime Mini-App</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -33,6 +44,15 @@
         <p>
           Говорите после подключения. Ответ будет воспроизводиться
           автоматически.
+        </p>
+      </div>
+      <div class="ios-fix" id="iosFix" style="display: none">
+        <button id="fixMicrophoneBtn" class="fix-btn">
+          🔧 Восстановить микрофон в Telegram
+        </button>
+        <p class="fix-hint">
+          Если после использования приложения не работает микрофон в Telegram,
+          нажмите эту кнопку
         </p>
       </div>
     </div>
