@@ -7,6 +7,7 @@ let micStream = null;
 let remoteAudioEl = null;
 let dataChannel = null;
 let isActive = false;
+let isStopping = false;
 let selectedRole = "default";
 
 // Role configurations
@@ -49,6 +50,14 @@ function getUrlToken() {
   } catch (_) {
     return null;
   }
+}
+
+function isIOS() {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
 }
 
 function setButtonState(state) {
@@ -159,15 +168,30 @@ async function startRealtime() {
 }
 
 async function stopRealtime() {
+  if (isStopping) return;
+  isStopping = true;
   console.log("stopRealtime");
   setButtonState(null);
   try {
+    isActive = false;
+    setActiveUI(false);
     if (dataChannel && dataChannel.readyState !== "closed") {
       try {
         dataChannel.close();
       } catch (_) {}
     }
     if (pc) {
+      // Try to detach and stop tracks before closing pc (iOS is picky)
+      try {
+        pc.getSenders().forEach((sender) => {
+          try {
+            if (sender.track) sender.track.stop();
+          } catch (_) {}
+          try {
+            pc.removeTrack(sender);
+          } catch (_) {}
+        });
+      } catch (_) {}
       pc.getSenders().forEach((s) => {
         try {
           s.track && s.track.stop();
@@ -186,10 +210,24 @@ async function stopRealtime() {
     }
     if (remoteAudioEl) {
       try {
+        remoteAudioEl.pause && remoteAudioEl.pause();
+      } catch (_) {}
+      try {
         remoteAudioEl.srcObject = null;
       } catch (_) {}
       try {
+        remoteAudioEl.removeAttribute &&
+          remoteAudioEl.removeAttribute("srcObject");
+      } catch (_) {}
+      try {
         remoteAudioEl.remove();
+      } catch (_) {}
+    }
+    // iOS sometimes keeps the AVAudioSession locked; open/close a dummy stream to release it
+    if (isIOS()) {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+        s.getTracks().forEach((t) => t.stop());
       } catch (_) {}
     }
   } finally {
@@ -198,6 +236,7 @@ async function stopRealtime() {
     dataChannel = null;
     remoteAudioEl = null;
     setStatus("Отключено");
+    isStopping = false;
   }
 }
 
@@ -233,8 +272,6 @@ roleSelect.addEventListener("change", updateRoleSelection);
 
 micButton.addEventListener("click", async () => {
   if (isActive) {
-    setActiveUI(false);
-    isActive = false;
     await stopRealtime();
     return;
   }
@@ -245,8 +282,6 @@ micButton.addEventListener("click", async () => {
     await startRealtime();
   } catch (e) {
     console.error(e);
-    setActiveUI(false);
-    isActive = false;
     setStatus(`Ошибка: ${e.message}`);
     await stopRealtime();
   }
@@ -254,3 +289,37 @@ micButton.addEventListener("click", async () => {
 
 // Initialize role selection
 updateRoleSelection();
+
+// Ensure we release the microphone when the webview goes to background or closes
+function cleanupOnHideOrClose() {
+  if (isActive || pc || micStream) {
+    stopRealtime();
+  }
+}
+
+// Page lifecycle hooks (important for iOS)
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    cleanupOnHideOrClose();
+  }
+});
+
+// pagehide is more reliable on iOS/Safari than beforeunload
+window.addEventListener("pagehide", () => {
+  cleanupOnHideOrClose();
+});
+
+// As a last resort
+window.addEventListener("beforeunload", () => {
+  cleanupOnHideOrClose();
+});
+
+// Telegram-specific hooks
+try {
+  if (isRunningInTelegram()) {
+    // Stop session when user taps back button in Telegram
+    window.Telegram.WebApp.onEvent("backButtonClicked", () => {
+      cleanupOnHideOrClose();
+    });
+  }
+} catch (_) {}
