@@ -70,7 +70,41 @@ const extractTextFromResponse = (resp) => {
 
   // Стандартный Chat Completions ответ
   if (resp.choices && resp.choices[0]?.message?.content) {
-    return String(resp.choices[0].message.content).trim();
+    const content = resp.choices[0].message.content;
+    if (typeof content === "string") return content.trim();
+    if (Array.isArray(content)) {
+      const text = content
+        .map((part) => {
+          if (typeof part === "string") return part;
+          if (part && typeof part === "object") {
+            if (typeof part.text === "string") return part.text;
+            if (typeof part.output_text === "string") return part.output_text;
+            if (typeof part.content === "string") return part.content;
+          }
+          return "";
+        })
+        .filter(Boolean)
+        .join("")
+        .trim();
+      if (text.length > 0) return text;
+      // Если не нашли явный текст — отдадим JSON, чтобы не было [object Object]
+      try {
+        return JSON.stringify(content);
+      } catch (_) {
+        return "";
+      }
+    }
+    if (typeof content === "object" && content) {
+      // Пытаемся вытащить поле text из объекта
+      if (typeof content.text === "string") return content.text.trim();
+      if (typeof content.output_text === "string")
+        return content.output_text.trim();
+      try {
+        return JSON.stringify(content);
+      } catch (_) {
+        return "";
+      }
+    }
   }
 
   // Фоллбэк для других форматов
@@ -176,7 +210,7 @@ export const handleOpenAiRequestWithWebSearch = async (
   }
 };
 
-export const handleOpenAiRequestVoice = async (messages, maleVoice = true) => {
+export const handleOpenAiRequestVoice = async (messages) => {
   try {
     await fs.promises.mkdir(speechDir, { recursive: true });
 
@@ -185,7 +219,7 @@ export const handleOpenAiRequestVoice = async (messages, maleVoice = true) => {
 
     const mp3 = await globalOpenAI.audio.speech.create({
       model: "tts-1",
-      voice: maleVoice ? "alloy" : "nova",
+      voice: "alloy",
       input: text,
     });
 

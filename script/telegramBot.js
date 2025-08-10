@@ -30,7 +30,6 @@ const defaultParameters = () => ({
   answerVoice: false,
   drawImage: false,
   voiceLang: "Russian",
-  voiceMale: true,
 });
 
 const setRole = async (ctx) => {
@@ -103,10 +102,7 @@ const textHandler = async (ctx, userMessage) => {
       await ctx.telegram.sendChatAction(ctx.chat.id, "record_voice");
       const requestString = `${userMessage} Отвечай, пожалуйста на ${ctx.session.parametres.voiceLang} язык`;
       ctx.session.messages.push({ role: roles.USER, content: requestString });
-      const response = await handleOpenAiRequestVoice(
-        ctx.session.messages,
-        ctx.session.parametres.voiceMale
-      );
+      const response = await handleOpenAiRequestVoice(ctx.session.messages);
       if (response?.text) {
         ctx.session.messages.push({
           role: roles.ASSISTANT,
@@ -160,17 +156,7 @@ const selectText = async (ctx) => {
   ctx.session.parametres.answerVoice = false;
 };
 
-const setMaleVoice = async (ctx) => {
-  await checkSession(ctx);
-  await ctx.reply("Ответы будут мужским голосом");
-  ctx.session.parametres.voiceMale = true;
-};
-
-const setWomanVoice = async (ctx) => {
-  await checkSession(ctx);
-  await ctx.reply("Ответы будут женским голосом");
-  ctx.session.parametres.voiceMale = false;
-};
+// Удалены функции смены голоса (мужской/женский), используем голос по умолчанию
 
 const welcomeMsg = async (ctx) => {
   await ctx.reply(
@@ -199,10 +185,6 @@ export function setupBotCommands(bot) {
 
   bot.hears(menu.menuSelectVoice, selectVoice);
   bot.hears(menu.menuSelectText, selectText);
-
-  bot.hears(menu.menuVoiceMan, setMaleVoice);
-  bot.hears(menu.menuVoiceWoman, setWomanVoice);
-  // removed dead handler for menuVoice (button is not present in main menu)
 
   // Realtime mini-app open button
   bot.hears(menu.menuRealtime, async (ctx) => {

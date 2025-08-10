@@ -3,8 +3,6 @@ import { Markup } from "telegraf";
 export const menuNewSession = "Новая сессия";
 export const menuRole = "Роль";
 export const menuBack = "Назад";
-export const menuVoiceMan = "Мужской";
-export const menuVoiceWoman = "Женский";
 export const menuImage = "Картинка";
 export const menuSelectVoice = "Отвечать голосом";
 export const menuSelectText = "Отвечать текстом";
@@ -18,17 +16,9 @@ const menuArr = [
   [menuRealtime],
 ];
 
-const voiceArr = [
-  [menuSelectVoice],
-  [menuVoiceMan, menuVoiceWoman],
-  [menuBack],
-];
+const voiceArr = [[menuSelectVoice], [menuBack]];
 
-const voiceArrText = [
-  [menuSelectText],
-  [menuVoiceMan, menuVoiceWoman],
-  [menuBack],
-];
+const voiceArrText = [[menuSelectText], [menuBack]];
 
 export const mainMenu = Markup.keyboard(menuArr).resize();
 export const voiceMenu = Markup.keyboard(voiceArr).resize();
