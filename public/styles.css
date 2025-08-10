@@ -93,24 +93,34 @@ h1 {
   box-shadow: 0 10px 24px rgba(255, 77, 109, 0.45),
     0 0 0 12px rgba(255, 77, 109, 0.1);
 }
-#micButton.active-pulse {
-  animation: pulse 1.6s ease-in-out infinite;
+/* Анимация для записи */
+#micButton.recording {
+  animation: pulse-record 1s ease-in-out infinite;
 }
-@keyframes pulse {
-  0% {
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45),
-      inset 0 2px 8px rgba(255, 255, 255, 0.05), 0 0 0 0 rgba(110, 168, 254, 0);
-  }
-  70% {
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45),
-      inset 0 2px 8px rgba(255, 255, 255, 0.05),
-      0 0 0 24px rgba(110, 168, 254, 0.12);
-  }
+@keyframes pulse-record {
+  0%,
   100% {
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45),
-      inset 0 2px 8px rgba(255, 255, 255, 0.05), 0 0 0 0 rgba(110, 168, 254, 0);
+    box-shadow: 0 0 0 0 rgba(117, 82, 241, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 20px rgba(247, 19, 61, 0);
   }
 }
+
+/* Анимация для воспроизведения */
+#micButton.playing {
+  animation: pulse-play 1.4s ease-in-out infinite;
+}
+@keyframes pulse-play {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(2, 253, 35, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 20px rgba(248, 252, 1, 0);
+  }
+}
+
 .status {
   color: var(--muted);
   font-size: 14px;

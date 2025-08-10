@@ -49,13 +49,16 @@ function verifyInitData(raw, botToken) {
   if (computed !== hash) return { ok: false };
   const userJson = params.get("user");
   let userId = null;
+  let userName = null;
   if (userJson) {
     try {
       const user = JSON.parse(userJson);
+      console.log(user);
       userId = user?.id ?? null;
+      userName = user?.first_name ?? user?.username ?? null;
     } catch (_) {}
   }
-  return { ok: true, userId };
+  return { ok: true, userId, userName };
 }
 
 function verifyWebToken(t, botToken) {
@@ -106,8 +109,9 @@ export function registerApiRoutes(app) {
       const initData = req.header("x-telegram-init-data") || "";
       const webToken = req.header("x-webapp-token") || "";
 
+      let verification = null;
       if (!testMode) {
-        const verification = verifyInitData(initData, botToken);
+        verification = verifyInitData(initData, botToken);
         const tokenData = verifyWebToken(webToken, botToken);
         const userIdToCheck = verification.userId || tokenData?.uid;
         if (
@@ -125,9 +129,10 @@ export function registerApiRoutes(app) {
         return res.status(400).json({ error: "Missing role data" });
       }
 
-      // Store role selection in session or temporary storage
-      // For now, just log it - you can implement session storage later
-      console.log(`User role set: ${name} (${voice}) - Role: ${role}`);
+      // Получаем имя пользователя из initData, если доступно
+      const telegramUserName = testMode
+        ? "Kirill"
+        : verification?.userName || "Unknown";
 
       const roleInstruction = role;
 
@@ -148,8 +153,6 @@ export function registerApiRoutes(app) {
           break;
       }
 
-      console.log(roleInstruction + " " + voiceInstruction);
-
       const resp = await fetch("https://api.openai.com/v1/realtime/sessions", {
         method: "POST",
         headers: {
@@ -159,7 +162,7 @@ export function registerApiRoutes(app) {
         body: JSON.stringify({
           model: MODEL,
           voice: voice,
-          instructions: roleInstruction + " " + voiceInstruction,
+          instructions: `User: ${telegramUserName}. ${roleInstruction} ${voiceInstruction}`,
           input_audio_format: "pcm16",
           output_audio_format: "pcm16",
           input_audio_transcription: {
@@ -174,7 +177,6 @@ export function registerApiRoutes(app) {
       }
 
       const json = await resp.json();
-      console.log("Session created successfully");
       res.json(json);
     } catch (error) {
       console.error("Error setting role:", error);
@@ -205,6 +207,12 @@ export function registerApiRoutes(app) {
           ) {
             return res.status(401).json({ error: "Unauthorized" });
           }
+          console.log(
+            "User:",
+            verification.userName || "Unknown",
+            "ID:",
+            verification.userId
+          );
         }
 
         const offerSdp = req.body || "";

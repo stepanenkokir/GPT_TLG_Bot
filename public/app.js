@@ -23,16 +23,12 @@ function setStatus(text) {
 
 function setActiveUI(active) {
   micButton.setAttribute("aria-pressed", active ? "true" : "false");
-  micButton.classList.toggle("active-pulse", active);
   // Disable role selector during active session
   roleSelect.disabled = active;
 }
 
 function updateRoleSelection() {
   selectedRole = roleSelect.value;
-  console.log(
-    `Role selected: ${roleConfigs[selectedRole].name} (${roleConfigs[selectedRole].voice})`
-  );
 }
 
 function isRunningInTelegram() {
@@ -55,6 +51,11 @@ function getUrlToken() {
   }
 }
 
+function setButtonState(state) {
+  micButton.classList.remove("recording", "playing");
+  if (state) micButton.classList.add(state);
+}
+
 // All OpenAI communication is proxied by the server; no keys on client
 
 async function startRealtime() {
@@ -71,7 +72,6 @@ async function startRealtime() {
   // Send role selection to server
   const sessionToken = await sendRoleToServer();
 
-  console.log("Session token:", sessionToken.client_secret);
   const EPHEMERAL_KEY = sessionToken.client_secret.value;
 
   setStatus("Инициализация WebRTC...");
@@ -97,7 +97,16 @@ async function startRealtime() {
   dataChannel = pc.createDataChannel("oai-events");
   dataChannel.onmessage = (msg) => {
     // You can log events if needed
-    // console.log("DC message:", msg.data);
+    //console.log("DC message:", msg.data);
+    if (msg.data.includes("input_audio_buffer")) {
+      setButtonState("recording");
+    } else if (msg.data.includes("output_audio_buffer")) {
+      setButtonState("playing");
+    }
+
+    if (msg.data.includes("stopped")) {
+      setButtonState(null);
+    }
   };
 
   pc.onconnectionstatechange = () => {
@@ -150,6 +159,8 @@ async function startRealtime() {
 }
 
 async function stopRealtime() {
+  console.log("stopRealtime");
+  setButtonState(null);
   try {
     if (dataChannel && dataChannel.readyState !== "closed") {
       try {
@@ -210,7 +221,6 @@ async function sendRoleToServer() {
       throw new Error(`Failed to set role: ${response.status}`);
     }
 
-    console.log(`Role sent to server: ${roleConfigs[selectedRole].name}`);
     return response.json();
   } catch (error) {
     console.error("Error sending role to server:", error);
