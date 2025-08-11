@@ -9,8 +9,6 @@ let dataChannel = null;
 let isActive = false;
 let isStopping = false;
 let selectedRole = "default";
-let outputTextBuffer = "";
-let lastSentResponseId = null;
 
 // Role configurations
 const roleConfigs = {
@@ -156,72 +154,6 @@ async function startRealtime() {
     if (msg.data.includes("stopped")) {
       setButtonState(null);
       // отправить сообщение в телеграм
-    }
-    // Buffer streaming text; send only on final events
-    try {
-      const evt = JSON.parse(msg.data);
-      if (!evt || typeof evt !== "object") return;
-
-      const type = evt.type;
-
-      if (type === "response.output_text.delta") {
-        const delta = typeof evt.delta === "string" ? evt.delta : "";
-        if (delta) outputTextBuffer += delta;
-        return; // do not forward chunks
-      }
-
-      const sendBufferedIfAny = (responseId) => {
-        const text = outputTextBuffer.trim();
-        if (!text) return;
-        if (responseId && lastSentResponseId === responseId) {
-          outputTextBuffer = "";
-          return;
-        }
-        fetch("/api/realtime-message", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-telegram-init-data": getInitData(),
-            "x-webapp-token": getUrlToken() || "",
-          },
-          body: JSON.stringify({ text }),
-        }).catch(() => {});
-        lastSentResponseId = responseId || lastSentResponseId;
-        outputTextBuffer = "";
-      };
-
-      if (type === "response.output_text.done") {
-        const respId = evt.response_id || evt.response?.id || null;
-        sendBufferedIfAny(respId);
-        return;
-      }
-
-      if (type === "response.final") {
-        const respId = evt.response_id || evt.response?.id || null;
-        const finalText =
-          typeof evt.text === "string" && evt.text.trim()
-            ? evt.text.trim()
-            : null;
-        if (finalText) {
-          if (!respId || lastSentResponseId !== respId) {
-            fetch("/api/realtime-message", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "x-telegram-init-data": getInitData(),
-                "x-webapp-token": getUrlToken() || "",
-              },
-              body: JSON.stringify({ text: finalText }),
-            }).catch(() => {});
-            lastSentResponseId = respId || lastSentResponseId;
-          }
-          outputTextBuffer = "";
-        } else {
-          sendBufferedIfAny(respId);
-        }
-      }
-    } catch (_) {
-      // Non-JSON control messages are ignored
     }
   };
 
