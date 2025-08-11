@@ -53,7 +53,6 @@ function verifyInitData(raw, botToken) {
   if (userJson) {
     try {
       const user = JSON.parse(userJson);
-      console.log(user);
       userId = user?.id ?? null;
       userName = user?.first_name ?? user?.username ?? null;
     } catch (_) {}
@@ -207,12 +206,6 @@ export function registerApiRoutes(app) {
           ) {
             return res.status(401).json({ error: "Unauthorized" });
           }
-          console.log(
-            "User:",
-            verification.userName || "Unknown",
-            "ID:",
-            verification.userId
-          );
         }
 
         const offerSdp = req.body || "";
