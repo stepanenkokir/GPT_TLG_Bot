@@ -5,6 +5,8 @@ import { fileURLToPath } from "url";
 import config from "config";
 import { createHmac } from "crypto";
 import { isUserAuthorized } from "../middleware/checkAuthUser.js";
+import { Telegraf } from "telegraf";
+import { sendMessageInChunks } from "../script/telegramUtils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -86,6 +88,8 @@ export function registerApiRoutes(app) {
   const testMode = config.has("webapp.TEST_MODE")
     ? config.get("webapp.TEST_MODE")
     : false;
+
+  const bot = new Telegraf(botToken);
 
   // Gate index page: allow only inside Telegram WebApp and authorized users
   app.get(["/", "/index.html"], (req, res) => {
@@ -181,6 +185,29 @@ export function registerApiRoutes(app) {
       console.error("Error setting role:", error);
       res.status(500).json({ error: "Failed to set role" });
     }
+  });
+
+  app.post("/api/realtime-message", express.json(), async (req, res) => {
+    const { text } = req.body;
+    const initData = req.header("x-telegram-init-data") || "";
+    const verification = testMode
+      ? { userId: config.get("webapp.testId"), ok: true }
+      : verifyInitData(initData, botToken);
+    const userIdToCheck = verification.userId;
+
+    if (
+      !verification.ok ||
+      !userIdToCheck ||
+      !isUserAuthorized(userIdToCheck)
+    ) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    await sendMessageInChunks(bot.telegram, userIdToCheck, text, {
+      parse_mode: "HTML",
+      disable_web_page_preview: false,
+    });
+    res.json({ ok: true });
   });
 
   // Proxy WebRTC SDP exchange to OpenAI Realtime. Body is raw SDP text

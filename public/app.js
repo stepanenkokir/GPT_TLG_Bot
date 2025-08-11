@@ -144,7 +144,7 @@ async function startRealtime() {
   dataChannel = pc.createDataChannel("oai-events");
   dataChannel.onmessage = (msg) => {
     // You can log events if needed
-    //console.log("DC message:", msg.data);
+    // console.log("DC message:", msg.data);
     if (msg.data.includes("input_audio_buffer")) {
       setButtonState("recording");
     } else if (msg.data.includes("output_audio_buffer")) {
@@ -153,7 +153,26 @@ async function startRealtime() {
 
     if (msg.data.includes("stopped")) {
       setButtonState(null);
+    }
+
+    if (
+      msg.data.includes(`conversation.item.input_audio_transcription.completed`)
+    ) {
+      const jsonMsg = JSON.parse(msg.data);
       // отправить сообщение в телеграм
+      const requestTranscript = jsonMsg?.transcript;
+      if (requestTranscript) {
+        sendMessageToTelegram("Запрос: " + requestTranscript);
+      }
+    }
+
+    if (msg.data.includes(`response.output_item.done`)) {
+      // отправить сообщение в телеграм
+      const jsonMsg = JSON.parse(msg.data);
+      const responseTranscript = jsonMsg?.item?.content[0].transcript;
+      if (responseTranscript) {
+        sendMessageToTelegram("Ответ: " + responseTranscript);
+      }
     }
   };
 
@@ -361,6 +380,19 @@ function cleanupOnHideOrClose() {
     stopRealtime();
   }
 }
+
+const sendMessageToTelegram = async (message) => {
+  console.log("SEND MESSAGE TO TELEGRAM", message);
+  await fetch("/api/realtime-message", {
+    method: "POST",
+    body: JSON.stringify({ text: message }),
+    headers: {
+      "Content-Type": "application/json",
+      "x-telegram-init-data": getInitData(),
+      "x-webapp-token": getUrlToken() || "",
+    },
+  });
+};
 
 // Page lifecycle hooks (important for iOS)
 document.addEventListener("visibilitychange", () => {
