@@ -5,6 +5,7 @@ import { setupBotCommands } from "./script/telegramBot.js";
 import { checkAuthUserImproved } from "./middleware/checkAuthUser.js";
 import { createLogger, format, transports } from "winston";
 import fs from "fs/promises";
+import { setBotInstance } from "./script/botInstance.js";
 
 const botToken = config.get("telegramBot.token");
 
@@ -47,6 +48,7 @@ export function launchTelegramBot() {
 
   ensureLogDir();
   bot.launch().then(() => console.log("Бот запущен"));
+  setBotInstance(bot);
 
   process.once("SIGINT", () => bot.stop("SIGINT"));
   process.once("SIGTERM", () => bot.stop("SIGTERM"));

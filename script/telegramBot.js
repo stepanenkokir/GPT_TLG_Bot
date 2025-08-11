@@ -2,6 +2,7 @@
 import {
   createOpenAiImage,
   handleOpenAiRequest,
+  handleOpenAiRequestWithWebSearch,
   handleOpenAiVoice,
   handleOpenAiRequestVoice,
 } from "./openai.js";
@@ -9,6 +10,7 @@ import { ogg } from "./ogg.js";
 import * as menu from "./tlgBotMenu.js";
 import config from "config";
 import { createHmac } from "crypto";
+import { replyInChunks } from "./telegramUtils.js";
 
 const roles = {
   ASSISTANT: "assistant",
@@ -30,6 +32,7 @@ const defaultParameters = () => ({
   answerVoice: false,
   drawImage: false,
   voiceLang: "Russian",
+  useWebSearch: false,
 });
 
 const setRole = async (ctx) => {
@@ -117,18 +120,23 @@ const textHandler = async (ctx, userMessage) => {
       await ctx.telegram.sendChatAction(ctx.chat.id, "typing");
       ctx.session.messages.push({ role: roles.USER, content: userMessage });
 
-      const { text, error } = await handleOpenAiRequest(ctx.session.messages);
+      const useWeb = Boolean(ctx.session.parametres.useWebSearch);
+      const handler = useWeb
+        ? handleOpenAiRequestWithWebSearch
+        : handleOpenAiRequest;
+      const { text, error } = await handler(ctx.session.messages);
 
       if (error) {
-        await ctx.reply(`Ошибочка вышла: ${error}`);
+        await replyInChunks(ctx, `Ошибочка вышла: ${error}`);
       } else if (text && text.trim().length > 0) {
         ctx.session.messages.push({
           role: roles.ASSISTANT,
           content: text,
         });
-        await ctx.reply(text);
+        await replyInChunks(ctx, text);
       } else {
-        await ctx.reply(
+        await replyInChunks(
+          ctx,
           "Что-то я устал, надо поспать... Давай попробуем позже"
         );
       }
@@ -185,6 +193,16 @@ export function setupBotCommands(bot) {
 
   bot.hears(menu.menuSelectVoice, selectVoice);
   bot.hears(menu.menuSelectText, selectText);
+  bot.hears(menu.menuWebSearch, async (ctx) => {
+    await checkSession(ctx);
+    const enabled = Boolean(ctx.session.parametres.useWebSearch);
+    await replyInChunks(
+      ctx,
+      `Режим Web Search: ${enabled ? "включён" : "выключен"}.` +
+        "\nНажми кнопку ниже, чтобы переключить.",
+      menu.buildWebSearchInlineKeyboard(enabled)
+    );
+  });
 
   // Realtime mini-app open button
   bot.hears(menu.menuRealtime, async (ctx) => {
@@ -216,6 +234,23 @@ export function setupBotCommands(bot) {
   bot.on("text", async (ctx) => {
     const userMessage = ctx.message.text;
     await textHandler(ctx, userMessage);
+  });
+
+  // Обработка инлайн-кнопки переключения Web Search
+  bot.action("toggle_websearch", async (ctx) => {
+    await checkSession(ctx);
+    const prev = Boolean(ctx.session.parametres.useWebSearch);
+    ctx.session.parametres.useWebSearch = !prev;
+    const now = ctx.session.parametres.useWebSearch;
+    try {
+      await ctx.editMessageReplyMarkup(
+        menu.buildWebSearchInlineKeyboard(now).reply_markup
+      );
+    } catch (_) {}
+    await ctx.answerCbQuery(
+      now ? "Web Search включён" : "Web Search выключен",
+      { show_alert: false }
+    );
   });
 
   bot.on("message", async (ctx) => {

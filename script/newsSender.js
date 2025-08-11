@@ -4,6 +4,7 @@ import cron from "node-cron";
 import { handleOpenAiRequestWithWebSearch } from "./openai.js";
 import { Telegraf } from "telegraf";
 import config from "config";
+import { sendMessageInChunks } from "./telegramUtils.js";
 
 // Инициализация бота для отправки сообщений
 const botToken = config.get("telegramBot.token");
@@ -85,7 +86,7 @@ class NewsSender {
     // Отправка новостей всем пользователям
     for (const userId of this.userIds) {
       try {
-        await bot.telegram.sendMessage(userId, sendMessage, {
+        await sendMessageInChunks(bot.telegram, userId, sendMessage, {
           parse_mode: "HTML",
           disable_web_page_preview: false,
         });
@@ -151,7 +152,7 @@ class NewsSender {
   startWeeklyJob() {
     // Еженедельная сводка по воскресеньям в 10:00
     cron.schedule(
-      "0 10 * * 0",
+      "* 10 * * 0",
       async () => {
         console.log("Запуск еженедельной сводки новостей...");
         await this.loadUserIds();
@@ -172,7 +173,7 @@ class NewsSender {
 
           for (const userId of this.userIds) {
             try {
-              await bot.telegram.sendMessage(userId, weeklyMessage, {
+              await sendMessageInChunks(bot.telegram, userId, weeklyMessage, {
                 parse_mode: "HTML",
               });
             } catch (error) {

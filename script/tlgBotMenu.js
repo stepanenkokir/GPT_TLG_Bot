@@ -7,12 +7,14 @@ export const menuImage = "Картинка";
 export const menuSelectVoice = "Отвечать голосом";
 export const menuSelectText = "Отвечать текстом";
 export const menuRealtime = "Realtime";
+export const menuWebSearch = "Web Search";
 
 const menuArr = [
   [menuNewSession],
   [menuRole],
   // голосовое меню скрыто, не показываем кнопку
   [menuImage],
+  [menuWebSearch],
   [menuRealtime],
 ];
 
@@ -26,3 +28,13 @@ export const voiceTextMenu = Markup.keyboard(voiceArrText).resize();
 
 export const buildRealtimeInlineKeyboard = (url) =>
   Markup.inlineKeyboard([[Markup.button.webApp("Открыть Realtime", url)]]);
+
+export const buildWebSearchInlineKeyboard = (enabled) =>
+  Markup.inlineKeyboard([
+    [
+      Markup.button.callback(
+        enabled ? "✅ Web Search ВКЛ" : "❌ Web Search ВЫКЛ",
+        "toggle_websearch"
+      ),
+    ],
+  ]);

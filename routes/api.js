@@ -251,4 +251,44 @@ export function registerApiRoutes(app) {
       }
     }
   );
+
+  // Receive realtime text from WebApp and forward to Telegram chat
+  app.post(
+    "/api/realtime-message",
+    express.json({ limit: "200kb" }),
+    async (req, res) => {
+      try {
+        const initData = req.header("x-telegram-init-data") || "";
+        const webToken = req.header("x-webapp-token") || "";
+        let userId = null;
+        if (!testMode) {
+          const verification = verifyInitData(initData, botToken);
+          const tokenData = verifyWebToken(webToken, botToken);
+          userId = verification.userId || tokenData?.uid || null;
+          if (!verification.ok || !userId || !isUserAuthorized(userId)) {
+            return res.status(401).json({ error: "Unauthorized" });
+          }
+        } else {
+          userId = 0; // dummy in test mode
+        }
+
+        const { text } = req.body || {};
+        if (!text || typeof text !== "string") {
+          return res.status(400).json({ error: "Missing text" });
+        }
+
+        const { getBotInstance } = await import("../script/botInstance.js");
+        const bot = getBotInstance();
+        if (!bot) {
+          return res.status(503).json({ error: "Bot not ready" });
+        }
+
+        await bot.telegram.sendMessage(userId, text);
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error("Failed to forward realtime message:", err);
+        return res.status(500).json({ error: "Failed to forward message" });
+      }
+    }
+  );
 }
