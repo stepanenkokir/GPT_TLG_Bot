@@ -1,29 +1,15 @@
 // Файл: jokeSender.js
-import fs from "fs/promises";
 import cron from "node-cron";
 import { handleOpenAiRequest } from "./openai.js";
-import { Telegraf } from "telegraf";
-import config from "config";
-
-// Инициализация бота для отправки сообщений
-const botToken = config.get("telegramBot.token");
-const bot = new Telegraf(botToken);
+import { getTelegramBot } from "./telegramBotInstance.js";
+import { BaseSender } from "./baseSender.js";
 
 // Класс для рассылки анекдотов
-class JokeSender {
+class JokeSender extends BaseSender {
   constructor(filePath) {
-    this.filePath = filePath;
-    this.userIds = [];
-  }
-
-  async loadUserIds() {
-    try {
-      const data = await fs.readFile(this.filePath, "utf-8");
-      this.userIds = JSON.parse(data);
-      console.log("Список пользователей загружен:", this.userIds);
-    } catch (error) {
-      console.error("Ошибка при загрузке списка пользователей:", error);
-    }
+    super(filePath);
+    // Start watching file for changes
+    this.startWatching();
   }
 
   async sendJokeToAllUsers() {
@@ -78,6 +64,7 @@ class JokeSender {
     const sendMessage = `Учим английский по анекдотам от Дилана\n\n${jokeResponse.text}`;
 
     // Отправка анекдота всем пользователям
+    const bot = getTelegramBot();
     for (const userId of this.userIds) {
       try {
         await bot.telegram.sendMessage(userId, sendMessage);
@@ -92,7 +79,8 @@ class JokeSender {
   }
 
   startDailyJob() {
-    console.log("Start some at ", new Date());
+    console.log("Start joke sender at ", new Date());
+    
     cron.schedule(
       "8 8 * * *",
       async () => {

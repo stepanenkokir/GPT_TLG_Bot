@@ -1,4 +1,5 @@
 // Файл: index.js
+import "./config/loader.js"; // Load environment variables first
 import JokeSender from "./script/jokeSender.js";
 import NewsSender from "./script/newsSender.js";
 import { createHttpServer } from "./server.js";

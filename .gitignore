@@ -4,3 +4,4 @@
 /voices/*.mp3
 /node_modules
 *.txt
+.env

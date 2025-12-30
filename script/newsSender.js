@@ -1,75 +1,57 @@
 // Файл: newsSender.js
-import fs from "fs/promises";
 import cron from "node-cron";
 import { handleOpenAiRequestWithWebSearch } from "./openai.js";
-import { Telegraf } from "telegraf";
-import config from "config";
+import { getTelegramBot } from "./telegramBotInstance.js";
 import { sendMessageInChunks } from "./telegramUtils.js";
-
-// Инициализация бота для отправки сообщений
-const botToken = config.get("telegramBot.token");
-const bot = new Telegraf(botToken);
+import { BaseSender } from "./baseSender.js";
 
 // Класс для рассылки новостей
-class NewsSender {
+class NewsSender extends BaseSender {
   constructor(filePath) {
-    this.filePath = filePath;
-    this.userIds = [];
-  }
-
-  async loadUserIds() {
-    try {
-      const data = await fs.readFile(this.filePath, "utf-8");
-      this.userIds = JSON.parse(data);
-      console.log("Список пользователей для новостей загружен:", this.userIds);
-    } catch (error) {
-      console.error(
-        "Ошибка при загрузке списка пользователей для новостей:",
-        error
-      );
-    }
+    super(filePath);
+    // Start watching file for changes
+    this.startWatching();
   }
 
   async sendNewsToAllUsers() {
-    const newsTopics = [
-      "technology and AI developments",
-      "global economy and markets",
-      "science and research breakthroughs",
-      "environmental and climate news",
-      "space exploration and astronomy",
-      "medical and health innovations",
-      "cybersecurity and digital privacy",
-      "renewable energy developments",
-      "automotive and electric vehicles",
-      "entertainment and pop culture",
-      "sports highlights",
-      "international politics and diplomacy",
-    ];
+    const currentDate = new Date();
+    const dateStr = currentDate.toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    const dayOfMonth = currentDate.getDate();
+    const month = currentDate.getMonth() + 1;
 
-    const currentTopic =
-      newsTopics[Math.floor(Math.random() * newsTopics.length)];
-    const currentDate = new Date().toLocaleDateString("ru-RU");
-
-    console.log(`Генерация новостей по теме: ${currentTopic}`);
+    console.log(`Генерация новостей о праздниках и событиях на ${dateStr}`);
 
     // Генерация новостного сводки с использованием web-search
     const newsResponse = await handleOpenAiRequestWithWebSearch([
       {
         role: "system",
-        content: `You are a professional news editor and English teacher for Russian speakers. You create engaging news summaries that help Russians learn English while staying informed. Your task is to:
-1. Find the latest and most relevant news on the given topic
-2. Create a concise summary in Russian with key English terms in parentheses
-3. Include 3-5 main news items with brief explanations
-4. Add vocabulary notes for important English words
-5. End with an encouraging note about learning English through news`,
+        content: `You are a cheerful and engaging news editor and English teacher for Russian speakers. You create fun and interesting news summaries about holidays, celebrations, and special events that help Russians learn English while staying informed about cultural events. Your task is to:
+1. Find what holidays, celebrations, and special events are happening today in Russia and the USA
+2. Include fun facts, interesting traditions, and cultural background
+3. Create an engaging summary in Russian with key English terms in parentheses
+4. Make it cheerful, positive, and entertaining
+5. Include 3-5 main items about what people celebrate today in both countries
+6. Add vocabulary notes for important English words related to holidays and celebrations
+7. End with an encouraging note about learning English through cultural events`,
       },
       {
         role: "user",
-        content: `Find the latest news about ${currentTopic} for today ${currentDate}. Create a news digest in Russian with English terms in parentheses. Include vocabulary explanations for key terms.`,
+        content: `Find fun and interesting information about what holidays, celebrations, and special events are happening today (${dateStr}, ${month}/${dayOfMonth}) in Russia and the United States. Include:
+- Official holidays and observances
+- Fun unofficial holidays and celebrations
+- Historical events that happened on this date
+- Cultural traditions and how people celebrate
+- Interesting facts and stories
+
+Create a cheerful and engaging news digest in Russian with English terms in parentheses. Make it entertaining and educational.`,
       },
       {
         role: "user",
-        content: `Format the news as a structured digest with clear sections and finish with a positive note about continuous learning and being available for questions.`,
+        content: `Format the news as a structured digest with clear sections for Russia and USA, include fun facts, and finish with a positive note about learning English through cultural events.`,
       },
     ]);
 
@@ -81,9 +63,10 @@ class NewsSender {
       return;
     }
 
-    const sendMessage = `📰 Изучаем английский через новости от Дилана\n${currentDate}\n\n${newsResponse.text}`;
+    const sendMessage = `🎉 Весёлые новости и праздники от Дилана\n📅 ${dateStr}\n\n${newsResponse.text}`;
 
     // Отправка новостей всем пользователям
+    const bot = getTelegramBot();
     for (const userId of this.userIds) {
       try {
         await sendMessageInChunks(bot.telegram, userId, sendMessage, {
@@ -135,9 +118,9 @@ class NewsSender {
       }
     );
 
-    // Вечерние новости в 18:00
+    // Вечерние новости в 22:00
     cron.schedule(
-      "0 22 * * *",
+      "47 20 * * *",
       async () => {
         console.log("Запуск вечерней рассылки новостей");
         await this.loadUserIds();
@@ -171,6 +154,7 @@ class NewsSender {
         if (weeklyDigest && weeklyDigest.text) {
           const weeklyMessage = `📰 Еженедельная сводка новостей от Дилана\n\n${weeklyDigest.text}`;
 
+          const bot = getTelegramBot();
           for (const userId of this.userIds) {
             try {
               await sendMessageInChunks(bot.telegram, userId, weeklyMessage, {

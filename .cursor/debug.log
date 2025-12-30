@@ -1,0 +1,136 @@
+{"location":"rateLimiter.js:105","message":"botRateLimitMiddleware START","data":{"userId":1120239873},"timestamp":1767068804144,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"bot.js:31","message":"saveLog START","data":{"chatId":1120239873,"hasText":true},"timestamp":1767068804150,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"bot.js:36","message":"BEFORE logger cache check","data":{"chatId":1120239873,"hasLogger":false},"timestamp":1767068804150,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"rateLimiter.js:117","message":"botRateLimitMiddleware END","data":{"rateLimitTime":5},"timestamp":1767068804149,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"telegramBot.js:107","message":"textHandler START","data":{"chatId":1120239873,"messageLength":7},"timestamp":1767068804157,"sessionId":"debug-session","runId":"run1","hypothesisId":"ALL"}
+{"location":"bot.js:49","message":"AFTER logger cache check","data":{"loggerCheckTime":4},"timestamp":1767068804154,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"telegramBot.js:172","message":"BEFORE trimMessages","data":{"messagesCount":2},"timestamp":1767068804827,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:trimMessages","message":"trimMessages START","data":{"messagesCount":2,"MAX_MESSAGES":20},"timestamp":1767068804828,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:trimMessages","message":"trimMessages SKIP (no trim needed)","data":{"trimTime":0},"timestamp":1767068804828,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:183","message":"BEFORE OpenAI API call","data":{"useWebSearch":false,"messagesCount":2},"timestamp":1767068804829,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:144","message":"handleOpenAiRequest START","data":{"messagesCount":2},"timestamp":1767068804829,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:175","message":"AFTER trimMessages","data":{"originalCount":2,"trimmedCount":2,"trimTime":1},"timestamp":1767068804828,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"openai.js:147","message":"BEFORE validateMessages","data":{"messagesCount":2},"timestamp":1767068804829,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"validators.js:48","message":"validateMessages START","data":{"messagesCount":2,"isArray":true},"timestamp":1767068804830,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"validators.js:62","message":"validateMessages VALID","data":{"validationTime":1},"timestamp":1767068804831,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:150","message":"AFTER validateMessages","data":{"valid":true,"validationTime":2},"timestamp":1767068804831,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:155","message":"BEFORE OpenAI API call","data":{"model":"gpt-5-mini-2025-08-07","messagesCount":2},"timestamp":1767068804832,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:163","message":"AFTER OpenAI API call","data":{"apiTime":4207},"timestamp":1767068809039,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:186","message":"AFTER OpenAI API call","data":{"apiCallTime":4211,"hasError":false,"textLength":142},"timestamp":1767068809039,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:195","message":"textHandler END","data":{"totalTime":5079},"timestamp":1767068809236,"sessionId":"debug-session","runId":"run1","hypothesisId":"ALL"}
+{"location":"bot.js:53","message":"saveLog END","data":{"saveLogTime":5087},"timestamp":1767068809237,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"rateLimiter.js:105","message":"botRateLimitMiddleware START","data":{"userId":1120239873},"timestamp":1767068846646,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"bot.js:36","message":"BEFORE logger cache check","data":{"chatId":1120239873,"hasLogger":true},"timestamp":1767068846647,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"bot.js:31","message":"saveLog START","data":{"chatId":1120239873,"hasText":true},"timestamp":1767068846647,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"rateLimiter.js:117","message":"botRateLimitMiddleware END","data":{"rateLimitTime":1},"timestamp":1767068846647,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"bot.js:49","message":"AFTER logger cache check","data":{"loggerCheckTime":1},"timestamp":1767068846648,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"telegramBot.js:107","message":"textHandler START","data":{"chatId":1120239873,"messageLength":43},"timestamp":1767068846651,"sessionId":"debug-session","runId":"run1","hypothesisId":"ALL"}
+{"location":"telegramBot.js:trimMessages","message":"trimMessages START","data":{"messagesCount":4,"MAX_MESSAGES":20},"timestamp":1767068846833,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:172","message":"BEFORE trimMessages","data":{"messagesCount":4},"timestamp":1767068846832,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:trimMessages","message":"trimMessages SKIP (no trim needed)","data":{"trimTime":0},"timestamp":1767068846833,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:175","message":"AFTER trimMessages","data":{"originalCount":4,"trimmedCount":4,"trimTime":2},"timestamp":1767068846834,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:183","message":"BEFORE OpenAI API call","data":{"useWebSearch":false,"messagesCount":4},"timestamp":1767068846834,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:144","message":"handleOpenAiRequest START","data":{"messagesCount":4},"timestamp":1767068846834,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:147","message":"BEFORE validateMessages","data":{"messagesCount":4},"timestamp":1767068846834,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"validators.js:48","message":"validateMessages START","data":{"messagesCount":4,"isArray":true},"timestamp":1767068846834,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"validators.js:62","message":"validateMessages VALID","data":{"validationTime":1},"timestamp":1767068846835,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:155","message":"BEFORE OpenAI API call","data":{"model":"gpt-5-mini-2025-08-07","messagesCount":4},"timestamp":1767068846836,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:150","message":"AFTER validateMessages","data":{"valid":true,"validationTime":2},"timestamp":1767068846836,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:186","message":"AFTER OpenAI API call","data":{"apiCallTime":10103,"hasError":false,"textLength":336},"timestamp":1767068856937,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:163","message":"AFTER OpenAI API call","data":{"apiTime":10100},"timestamp":1767068856936,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"bot.js:53","message":"saveLog END","data":{"saveLogTime":10529},"timestamp":1767068857176,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"telegramBot.js:195","message":"textHandler END","data":{"totalTime":10525},"timestamp":1767068857175,"sessionId":"debug-session","runId":"run1","hypothesisId":"ALL"}
+{"location":"rateLimiter.js:105","message":"botRateLimitMiddleware START","data":{"userId":1120239873},"timestamp":1767068894449,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"rateLimiter.js:117","message":"botRateLimitMiddleware END","data":{"rateLimitTime":0},"timestamp":1767068894449,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"bot.js:49","message":"AFTER logger cache check","data":{"loggerCheckTime":0},"timestamp":1767068894449,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"bot.js:31","message":"saveLog START","data":{"chatId":1120239873,"hasText":true},"timestamp":1767068894449,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"bot.js:36","message":"BEFORE logger cache check","data":{"chatId":1120239873,"hasLogger":true},"timestamp":1767068894449,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"telegramBot.js:107","message":"textHandler START","data":{"chatId":1120239873,"messageLength":42},"timestamp":1767068894450,"sessionId":"debug-session","runId":"run1","hypothesisId":"ALL"}
+{"location":"telegramBot.js:172","message":"BEFORE trimMessages","data":{"messagesCount":6},"timestamp":1767068894678,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:trimMessages","message":"trimMessages START","data":{"messagesCount":6,"MAX_MESSAGES":20},"timestamp":1767068894679,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:trimMessages","message":"trimMessages SKIP (no trim needed)","data":{"trimTime":0},"timestamp":1767068894679,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:183","message":"BEFORE OpenAI API call","data":{"useWebSearch":false,"messagesCount":6},"timestamp":1767068894680,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:144","message":"handleOpenAiRequest START","data":{"messagesCount":6},"timestamp":1767068894680,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:175","message":"AFTER trimMessages","data":{"originalCount":6,"trimmedCount":6,"trimTime":1},"timestamp":1767068894679,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"validators.js:48","message":"validateMessages START","data":{"messagesCount":6,"isArray":true},"timestamp":1767068894681,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"validators.js:62","message":"validateMessages VALID","data":{"validationTime":1},"timestamp":1767068894682,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:155","message":"BEFORE OpenAI API call","data":{"model":"gpt-5-mini-2025-08-07","messagesCount":6},"timestamp":1767068894683,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:147","message":"BEFORE validateMessages","data":{"messagesCount":6},"timestamp":1767068894681,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:150","message":"AFTER validateMessages","data":{"valid":true,"validationTime":2},"timestamp":1767068894683,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:163","message":"AFTER OpenAI API call","data":{"apiTime":13768},"timestamp":1767068908451,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:186","message":"AFTER OpenAI API call","data":{"apiCallTime":13771,"hasError":false,"textLength":1464},"timestamp":1767068908451,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:195","message":"textHandler END","data":{"totalTime":14248},"timestamp":1767068908698,"sessionId":"debug-session","runId":"run1","hypothesisId":"ALL"}
+{"location":"bot.js:53","message":"saveLog END","data":{"saveLogTime":14250},"timestamp":1767068908699,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"rateLimiter.js:105","message":"botRateLimitMiddleware START","data":{"userId":1120239873},"timestamp":1767068993334,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"rateLimiter.js:117","message":"botRateLimitMiddleware END","data":{"rateLimitTime":3},"timestamp":1767068993337,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"bot.js:31","message":"saveLog START","data":{"chatId":1120239873,"hasText":true},"timestamp":1767068993337,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"bot.js:36","message":"BEFORE logger cache check","data":{"chatId":1120239873,"hasLogger":false},"timestamp":1767068993337,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"bot.js:49","message":"AFTER logger cache check","data":{"loggerCheckTime":5},"timestamp":1767068993342,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"telegramBot.js:107","message":"textHandler START","data":{"chatId":1120239873,"messageLength":6},"timestamp":1767068993344,"sessionId":"debug-session","runId":"run1","hypothesisId":"ALL"}
+{"location":"telegramBot.js:172","message":"BEFORE trimMessages","data":{"messagesCount":2},"timestamp":1767068994003,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:trimMessages","message":"trimMessages START","data":{"messagesCount":2,"MAX_MESSAGES":20},"timestamp":1767068994004,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:175","message":"AFTER trimMessages","data":{"originalCount":2,"trimmedCount":2,"trimTime":2},"timestamp":1767068994005,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:trimMessages","message":"trimMessages SKIP (no trim needed)","data":{"trimTime":1},"timestamp":1767068994005,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"openai.js:144","message":"handleOpenAiRequest START","data":{"messagesCount":2},"timestamp":1767068994006,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:183","message":"BEFORE OpenAI API call","data":{"useWebSearch":false,"messagesCount":2},"timestamp":1767068994006,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:147","message":"BEFORE validateMessages","data":{"messagesCount":2},"timestamp":1767068994006,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"validators.js:48","message":"validateMessages START","data":{"messagesCount":2,"isArray":true},"timestamp":1767068994007,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"validators.js:62","message":"validateMessages VALID","data":{"validationTime":2},"timestamp":1767068994009,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:150","message":"AFTER validateMessages","data":{"valid":true,"validationTime":4},"timestamp":1767068994010,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:155","message":"Model and messages prepared","data":{"model":"gpt-5-mini-2025-08-07","messagesCount":2,"maxTokens":1000},"timestamp":1767068994010,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:155","message":"BEFORE OpenAI API call","data":{"model":"gpt-5-mini-2025-08-07","messagesCount":2},"timestamp":1767068994010,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:130","message":"requestWithRetry START","data":{"retries":2},"timestamp":1767068994010,"sessionId":"debug-session","runId":"run1","hypothesisId":"F"}
+{"location":"openai.js:142","message":"requestWithRetry ERROR","data":{"attempt":1,"error":"400 Unsupported value: 'temperature' does not support 0.7 with this model. Only the default (1) value is supported.","isRetryable":false,"willRetry":true},"timestamp":1767068994458,"sessionId":"debug-session","runId":"run1","hypothesisId":"F"}
+{"location":"telegramBot.js:177","message":"BEFORE handleError","data":{"error":"400 Unsupported value: 'temperature' does not support 0.7 with this model. Only the default (1) value is supported."},"timestamp":1767068994460,"sessionId":"debug-session","runId":"run1","hypothesisId":"D"}
+{"location":"telegramBot.js:183","message":"AFTER handleError","data":{"errorHandleTime":0},"timestamp":1767068994460,"sessionId":"debug-session","runId":"run1","hypothesisId":"D"}
+{"location":"telegramBot.js:186","message":"AFTER OpenAI API call","data":{"apiCallTime":453,"hasError":true,"textLength":0},"timestamp":1767068994459,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:195","message":"textHandler END","data":{"totalTime":1321},"timestamp":1767068994665,"sessionId":"debug-session","runId":"run1","hypothesisId":"ALL"}
+{"location":"bot.js:53","message":"saveLog END","data":{"saveLogTime":1329},"timestamp":1767068994666,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"rateLimiter.js:105","message":"botRateLimitMiddleware START","data":{"userId":1120239873},"timestamp":1767069031244,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"rateLimiter.js:117","message":"botRateLimitMiddleware END","data":{"rateLimitTime":3},"timestamp":1767069031247,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"bot.js:36","message":"BEFORE logger cache check","data":{"chatId":1120239873,"hasLogger":false},"timestamp":1767069031247,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"telegramBot.js:107","message":"textHandler START","data":{"chatId":1120239873,"messageLength":6},"timestamp":1767069031254,"sessionId":"debug-session","runId":"run1","hypothesisId":"ALL"}
+{"location":"bot.js:31","message":"saveLog START","data":{"chatId":1120239873,"hasText":true},"timestamp":1767069031247,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"bot.js:49","message":"AFTER logger cache check","data":{"loggerCheckTime":4},"timestamp":1767069031251,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"telegramBot.js:trimMessages","message":"trimMessages START","data":{"messagesCount":2,"MAX_MESSAGES":20},"timestamp":1767069031855,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:172","message":"BEFORE trimMessages","data":{"messagesCount":2},"timestamp":1767069031855,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:183","message":"BEFORE OpenAI API call","data":{"useWebSearch":false,"messagesCount":2},"timestamp":1767069031856,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:175","message":"AFTER trimMessages","data":{"originalCount":2,"trimmedCount":2,"trimTime":1},"timestamp":1767069031856,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"openai.js:144","message":"handleOpenAiRequest START","data":{"messagesCount":2},"timestamp":1767069031857,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:trimMessages","message":"trimMessages SKIP (no trim needed)","data":{"trimTime":1},"timestamp":1767069031856,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"openai.js:147","message":"BEFORE validateMessages","data":{"messagesCount":2},"timestamp":1767069031857,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"validators.js:48","message":"validateMessages START","data":{"messagesCount":2,"isArray":true},"timestamp":1767069031857,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"validators.js:62","message":"validateMessages VALID","data":{"validationTime":2},"timestamp":1767069031859,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:150","message":"AFTER validateMessages","data":{"valid":true,"validationTime":2},"timestamp":1767069031859,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:155","message":"Model and messages prepared","data":{"model":"gpt-5-mini-2025-08-07","messagesCount":2,"maxTokens":1000},"timestamp":1767069031859,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:155","message":"BEFORE OpenAI API call","data":{"model":"gpt-5-mini-2025-08-07","messagesCount":2},"timestamp":1767069031859,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:130","message":"requestWithRetry START","data":{"retries":2},"timestamp":1767069031859,"sessionId":"debug-session","runId":"run1","hypothesisId":"F"}
+{"location":"openai.js:138","message":"requestWithRetry SUCCESS","data":{"attempt":1,"retryTime":4490},"timestamp":1767069036349,"sessionId":"debug-session","runId":"run1","hypothesisId":"F"}
+{"location":"telegramBot.js:186","message":"AFTER OpenAI API call","data":{"apiCallTime":4494,"hasError":false,"textLength":154},"timestamp":1767069036350,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:163","message":"AFTER OpenAI API call","data":{"apiTime":4491},"timestamp":1767069036350,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:195","message":"textHandler END","data":{"totalTime":5446},"timestamp":1767069036700,"sessionId":"debug-session","runId":"run1","hypothesisId":"ALL"}
+{"location":"bot.js:53","message":"saveLog END","data":{"saveLogTime":5454},"timestamp":1767069036701,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"rateLimiter.js:105","message":"botRateLimitMiddleware START","data":{"userId":1120239873},"timestamp":1767069108951,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"rateLimiter.js:117","message":"botRateLimitMiddleware END","data":{"rateLimitTime":4},"timestamp":1767069108955,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"bot.js:31","message":"saveLog START","data":{"chatId":1120239873,"hasText":true},"timestamp":1767069108955,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"bot.js:36","message":"BEFORE logger cache check","data":{"chatId":1120239873,"hasLogger":false},"timestamp":1767069108956,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"bot.js:49","message":"AFTER logger cache check","data":{"loggerCheckTime":4},"timestamp":1767069108959,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"telegramBot.js:107","message":"textHandler START","data":{"chatId":1120239873,"messageLength":6},"timestamp":1767069108962,"sessionId":"debug-session","runId":"run1","hypothesisId":"ALL"}
+{"location":"telegramBot.js:172","message":"BEFORE trimMessages","data":{"messagesCount":2},"timestamp":1767069109596,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:trimMessages","message":"trimMessages START","data":{"messagesCount":2,"MAX_MESSAGES":20},"timestamp":1767069109598,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:trimMessages","message":"trimMessages SKIP (no trim needed)","data":{"trimTime":2},"timestamp":1767069109600,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"telegramBot.js:183","message":"BEFORE OpenAI API call","data":{"useWebSearch":false,"messagesCount":2},"timestamp":1767069109601,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:144","message":"handleOpenAiRequest START","data":{"messagesCount":2},"timestamp":1767069109602,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:175","message":"AFTER trimMessages","data":{"originalCount":2,"trimmedCount":2,"trimTime":5},"timestamp":1767069109601,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"openai.js:147","message":"BEFORE validateMessages","data":{"messagesCount":2},"timestamp":1767069109602,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"validators.js:48","message":"validateMessages START","data":{"messagesCount":2,"isArray":true},"timestamp":1767069109602,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"validators.js:62","message":"validateMessages VALID","data":{"validationTime":3},"timestamp":1767069109605,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:150","message":"AFTER validateMessages","data":{"valid":true,"validationTime":3},"timestamp":1767069109605,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:155","message":"Model and messages prepared","data":{"model":"gpt-5-nano-2025-08-07","messagesCount":2,"maxTokens":1000},"timestamp":1767069109605,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:155","message":"BEFORE OpenAI API call","data":{"model":"gpt-5-nano-2025-08-07","messagesCount":2},"timestamp":1767069109605,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:130","message":"requestWithRetry START","data":{"retries":2},"timestamp":1767069109605,"sessionId":"debug-session","runId":"run1","hypothesisId":"F"}
+{"location":"openai.js:138","message":"requestWithRetry SUCCESS","data":{"attempt":1,"retryTime":7412},"timestamp":1767069117017,"sessionId":"debug-session","runId":"run1","hypothesisId":"F"}
+{"location":"telegramBot.js:186","message":"AFTER OpenAI API call","data":{"apiCallTime":7417,"hasError":false,"textLength":198},"timestamp":1767069117018,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"openai.js:163","message":"AFTER OpenAI API call","data":{"apiTime":7413},"timestamp":1767069117018,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"telegramBot.js:195","message":"textHandler END","data":{"totalTime":8249},"timestamp":1767069117212,"sessionId":"debug-session","runId":"run1","hypothesisId":"ALL"}
+{"location":"bot.js:53","message":"saveLog END","data":{"saveLogTime":8257},"timestamp":1767069117212,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}

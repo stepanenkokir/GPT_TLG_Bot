@@ -1,5 +1,7 @@
 import OpenAI from "openai";
-import config from "config";
+import { getConfigValue, getConfigValueWithDefault } from "../config/loader.js";
+import { validateMessages } from "../middleware/validators.js";
+import { handleError } from "../utils/errorHandler.js";
 import fs from "fs";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -14,7 +16,7 @@ const speechFile = resolve(speechDir, "speech.mp3");
 // ===== Инициализация =====
 export const createOpenAiInstance = () => {
   if (globalOpenAI) return;
-  const openAiApiKey = config.get("openai.apiKey");
+  const openAiApiKey = getConfigValue("openai.apiKey", "OPENAI_API_KEY");
   if (!openAiApiKey) throw new Error("OpenAI API key is missing in config");
   globalOpenAI = new OpenAI({ apiKey: openAiApiKey });
 };
@@ -22,7 +24,11 @@ export const createOpenAiInstance = () => {
 // ===== Вспомогательные =====
 const getModel = () => {
   try {
-    const m = config.get("openai.model");
+    const m = getConfigValueWithDefault(
+      "openai.model",
+      "OPENAI_MODEL",
+      "gpt-4o-mini"
+    );
     return typeof m === "string" && m.trim() ? m.trim() : "gpt-4o-mini";
   } catch {
     return "gpt-4o-mini";
@@ -141,6 +147,15 @@ const requestWithRetry = async (fn, retries = 2) => {
 // ===== Основные методы =====
 export const handleOpenAiRequest = async (messages) => {
   try {
+    // Validate messages before processing
+    const validation = validateMessages(messages);
+    if (!validation.valid) {
+      return {
+        text: "",
+        error: `Invalid messages format: ${validation.error}`,
+      };
+    }
+
     const model = getModel();
     const chatMessages = toChatMessages(messages);
 
@@ -148,13 +163,13 @@ export const handleOpenAiRequest = async (messages) => {
       globalOpenAI.chat.completions.create({
         model,
         messages: chatMessages,
-        max_completion_tokens: 2000,
+        max_completion_tokens: 2000, // Reduced from 2000 to speed up responses
       })
     );
 
     return { text: extractTextFromResponse(resp) };
   } catch (e) {
-    console.error("Error in GPT Chat Completions API:", e);
+    handleError(e, { operation: "handleOpenAiRequest" });
     return { text: "", error: e.message };
   }
 };
@@ -165,6 +180,15 @@ export const handleOpenAiRequestWithWebSearch = async (
   options = {}
 ) => {
   try {
+    // Validate messages before processing
+    const validation = validateMessages(messages);
+    if (!validation.valid) {
+      return {
+        text: "",
+        error: `Invalid messages format: ${validation.error}`,
+      };
+    }
+
     const model = getModel();
 
     // Преобразуем сообщения в единый текстовый ввод для Responses API
@@ -205,7 +229,7 @@ export const handleOpenAiRequestWithWebSearch = async (
 
     return { text: extractTextFromResponse(resp) };
   } catch (e) {
-    console.error("Error in GPT Responses Web Search:", e);
+    handleError(e, { operation: "handleOpenAiRequestWithWebSearch" });
     return { text: "", error: e.message };
   }
 };
@@ -228,7 +252,7 @@ export const handleOpenAiRequestVoice = async (messages) => {
 
     return { text, buffer };
   } catch (e) {
-    console.error("Error in GPT VOICE API:", e);
+    handleError(e, { operation: "handleOpenAiRequestVoice" });
     return { text: "", error: e.message };
   }
 };
@@ -243,7 +267,7 @@ export const handleOpenAiVoice = async (filepath) => {
     );
     return { text: resp.text };
   } catch (e) {
-    console.error("Error in transcription:", e);
+    handleError(e, { operation: "handleOpenAiVoice" });
     return { text: "", error: e.message };
   }
 };
@@ -270,7 +294,7 @@ export const createOpenAiImage = async (prompt, quality = false) => {
     );
     return { url: resp.data?.[0]?.url || null };
   } catch (e) {
-    console.error("Error in createOpenAiImage:", e);
+    handleError(e, { operation: "createOpenAiImage" });
     return { url: null, error: e.message };
   }
 };
