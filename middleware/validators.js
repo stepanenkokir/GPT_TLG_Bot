@@ -69,7 +69,6 @@ export const roleSchema = Joi.object({
   voice: Joi.string()
     .valid("echo", "ash", "sage", "alloy", "ballad", "nova", "shimmer")
     .required(),
-  name: Joi.string().min(1).max(100).required(),
 });
 
 /**

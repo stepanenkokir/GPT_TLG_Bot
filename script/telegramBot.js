@@ -9,7 +9,7 @@ import {
 import { ogg } from "./ogg.js";
 import * as menu from "./tlgBotMenu.js";
 import { getConfigValue, getConfigValueWithDefault } from "../config/loader.js";
-import { createHmac } from "crypto";
+import { signWebToken } from "../utils/webToken.js";
 import { replyInChunks } from "./telegramUtils.js";
 import { handleError } from "../utils/errorHandler.js";
 
@@ -97,7 +97,7 @@ const checkSession = async (ctx) => {
     return false;
   }
   const currentTime = new Date();
-  if (currentTime - new Date(ctx.session.created) > 5 * 60 * 1000) {
+  if (currentTime - new Date(ctx.session.created) > 60 * 60 * 1000) {
     await createNewSession(ctx);
     return false;
   }
@@ -141,7 +141,7 @@ const textHandler = async (ctx, userMessage) => {
       
       // Trim messages before sending to OpenAI
       const trimmedMessages = trimMessages(ctx.session.messages);
-      const response = await handleOpenAiRequestVoice(trimmedMessages);
+      const response = await handleOpenAiRequestVoice(trimmedMessages, ctx.chat.id);
       if (response?.text) {
         ctx.session.messages.push({
           role: roles.ASSISTANT,
@@ -235,8 +235,8 @@ const backMsg = async (ctx) => {
 export function setupBotCommands(bot) {
   bot.start(async (ctx) => {
     console.log(`Start bot for ${ctx.chat.id}`);
-    createNewSession(ctx);
-    welcomeMsg(ctx);
+    await createNewSession(ctx);
+    await welcomeMsg(ctx);
   });
 
   bot.hears(menu.menuNewSession, async (ctx) => await createNewSession(ctx));
@@ -267,15 +267,8 @@ export function setupBotCommands(bot) {
       "WEBAPP_BASE_URL",
       "http://localhost:3000"
     );
-    const signWebToken = (payload) => {
-      const secret = getConfigValue("telegramBot.token", "TELEGRAM_BOT_TOKEN");
-      const exp = Math.floor(Date.now() / 1000) + 60; // 1 минута на открытие
-      const data = { ...payload, exp };
-      const body = Buffer.from(JSON.stringify(data)).toString("base64url");
-      const sig = createHmac("sha256", secret).update(body).digest("base64url");
-      return `${body}.${sig}`;
-    };
-    const token = signWebToken({ uid: ctx.from.id });
+    const secret = getConfigValue("telegramBot.token", "TELEGRAM_BOT_TOKEN");
+    const token = signWebToken({ uid: ctx.from.id }, secret, 60);
     const url = `${baseUrl}/?t=${encodeURIComponent(token)}`;
     await ctx.reply(
       "Открыть мини‑приложение Realtime",
@@ -314,7 +307,7 @@ export function setupBotCommands(bot) {
         const oggLink = await ctx.telegram.getFileLink(
           ctx.message.voice.file_id
         );
-        const oggPath = await ogg.create(oggLink.href, userId, "ogg");
+        const oggPath = await ogg.create(oggLink.href, userId);
         const mp3Path = await ogg.toMP3(oggPath, userId);
         try {
           const { text } = await handleOpenAiVoice(mp3Path);

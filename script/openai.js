@@ -2,16 +2,17 @@ import OpenAI from "openai";
 import { getConfigValue, getConfigValueWithDefault } from "../config/loader.js";
 import { validateMessages } from "../middleware/validators.js";
 import { handleError } from "../utils/errorHandler.js";
-import fs from "fs";
+import fs, { createReadStream } from "fs";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
-import { createReadStream } from "fs";
 
 let globalOpenAI = null;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const speechDir = resolve(__dirname, "../voices");
-const speechFile = resolve(speechDir, "speech.mp3");
+
+const getSpeechFile = (id) =>
+  resolve(speechDir, `speech_${id}_${Date.now()}.mp3`);
 
 // ===== Инициализация =====
 export const createOpenAiInstance = () => {
@@ -234,7 +235,8 @@ export const handleOpenAiRequestWithWebSearch = async (
   }
 };
 
-export const handleOpenAiRequestVoice = async (messages) => {
+export const handleOpenAiRequestVoice = async (messages, id = "default") => {
+  const speechFile = getSpeechFile(id);
   try {
     await fs.promises.mkdir(speechDir, { recursive: true });
 
@@ -254,6 +256,8 @@ export const handleOpenAiRequestVoice = async (messages) => {
   } catch (e) {
     handleError(e, { operation: "handleOpenAiRequestVoice" });
     return { text: "", error: e.message };
+  } finally {
+    await fs.promises.unlink(speechFile).catch(() => {});
   }
 };
 

@@ -15,7 +15,7 @@ const ensureLogDir = async () => {
   } catch (_) {}
 };
 
-export function launchTelegramBot() {
+export async function launchTelegramBot() {
   // Initialize OpenAI once for bot features
   createOpenAiInstance();
 
@@ -63,8 +63,14 @@ export function launchTelegramBot() {
 
   setupBotCommands(bot);
 
-  ensureLogDir();
-  bot.launch().then(() => console.log("Бот запущен"));
+  await ensureLogDir();
+  bot
+    .launch()
+    .then(() => console.log("Bot started"))
+    .catch((err) => {
+      console.error("Bot launch failed:", err);
+      process.exit(1);
+    });
 
   process.once("SIGINT", () => bot.stop("SIGINT"));
   process.once("SIGTERM", () => bot.stop("SIGTERM"));

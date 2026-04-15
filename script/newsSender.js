@@ -2,15 +2,13 @@
 import cron from "node-cron";
 import { handleOpenAiRequestWithWebSearch } from "./openai.js";
 import { getTelegramBot } from "./telegramBotInstance.js";
-import { sendMessageInChunks } from "./telegramUtils.js";
+import { escapeTelegramHtml, sendMessageInChunks } from "./telegramUtils.js";
 import { BaseSender } from "./baseSender.js";
 
 // Класс для рассылки новостей
 class NewsSender extends BaseSender {
   constructor(filePath) {
     super(filePath);
-    // Start watching file for changes
-    this.startWatching();
   }
 
   async sendNewsToAllUsers() {
@@ -25,11 +23,12 @@ class NewsSender extends BaseSender {
 
     console.log(`Генерация новостей о праздниках и событиях на ${dateStr}`);
 
-    // Генерация новостного сводки с использованием web-search
-    const newsResponse = await handleOpenAiRequestWithWebSearch([
-      {
-        role: "system",
-        content: `You are a cheerful and engaging news editor and English teacher for Russian speakers. You create fun and interesting news summaries about holidays, celebrations, and special events that help Russians learn English while staying informed about cultural events. Your task is to:
+    let newsResponse;
+    try {
+      newsResponse = await handleOpenAiRequestWithWebSearch([
+        {
+          role: "system",
+          content: `You are a cheerful and engaging news editor and English teacher for Russian speakers. You create fun and interesting news summaries about holidays, celebrations, and special events that help Russians learn English while staying informed about cultural events. Your task is to:
 1. Find what holidays, celebrations, and special events are happening today in Russia and the USA
 2. Include fun facts, interesting traditions, and cultural background
 3. Create an engaging summary in Russian with key English terms in parentheses
@@ -37,10 +36,10 @@ class NewsSender extends BaseSender {
 5. Include 3-5 main items about what people celebrate today in both countries
 6. Add vocabulary notes for important English words related to holidays and celebrations
 7. End with an encouraging note about learning English through cultural events`,
-      },
-      {
-        role: "user",
-        content: `Find fun and interesting information about what holidays, celebrations, and special events are happening today (${dateStr}, ${month}/${dayOfMonth}) in Russia and the United States. Include:
+        },
+        {
+          role: "user",
+          content: `Find fun and interesting information about what holidays, celebrations, and special events are happening today (${dateStr}, ${month}/${dayOfMonth}) in Russia and the United States. Include:
 - Official holidays and observances
 - Fun unofficial holidays and celebrations
 - Historical events that happened on this date
@@ -48,22 +47,26 @@ class NewsSender extends BaseSender {
 - Interesting facts and stories
 
 Create a cheerful and engaging news digest in Russian with English terms in parentheses. Make it entertaining and educational.`,
-      },
-      {
-        role: "user",
-        content: `Format the news as a structured digest with clear sections for Russia and USA, include fun facts, and finish with a positive note about learning English through cultural events.`,
-      },
-    ]);
+        },
+        {
+          role: "user",
+          content: `Format the news as a structured digest with clear sections for Russia and USA, include fun facts, and finish with a positive note about learning English through cultural events.`,
+        },
+      ]);
+    } catch (error) {
+      console.error("Ошибка при генерации новостей (OpenAI):", error);
+      return;
+    }
 
     if (!newsResponse || !newsResponse.text) {
       console.error(
         "Не удалось получить новости:",
-        newsResponse?.error || "Неизвестная ошибка"
+        newsResponse?.error || "Неизвестная ошибка",
       );
       return;
     }
 
-    const sendMessage = `🎉 Весёлые новости и праздники от Дилана\n📅 ${dateStr}\n\n${newsResponse.text}`;
+    const sendMessage = `🎉 Весёлые новости и праздники от Дилана\n📅 ${escapeTelegramHtml(dateStr)}\n\n${escapeTelegramHtml(newsResponse.text)}`;
 
     // Отправка новостей всем пользователям
     const bot = getTelegramBot();
@@ -77,7 +80,7 @@ Create a cheerful and engaging news digest in Russian with English terms in pare
       } catch (error) {
         console.error(
           `Ошибка отправки новостей пользователю ${userId}:`,
-          error
+          error,
         );
       }
     }
@@ -88,18 +91,21 @@ Create a cheerful and engaging news digest in Russian with English terms in pare
 
     console.log(`Генерация кастомных новостей по теме: ${topic}`);
 
-    const newsResponse = await handleOpenAiRequestWithWebSearch([
-      {
-        role: "system",
-        content: `You are a professional news editor and English teacher for Russian speakers. Create an engaging news summary about the requested topic that helps Russians learn English while staying informed.`,
-      },
-      {
-        role: "user",
-        content: `Find the latest news about "${topic}" for today ${currentDate}. Create a news digest in Russian with English terms in parentheses. Include vocabulary explanations for key terms and format as a structured digest.`,
-      },
-    ]);
-
-    return newsResponse;
+    try {
+      return await handleOpenAiRequestWithWebSearch([
+        {
+          role: "system",
+          content: `You are a professional news editor and English teacher for Russian speakers. Create an engaging news summary about the requested topic that helps Russians learn English while staying informed.`,
+        },
+        {
+          role: "user",
+          content: `Find the latest news about "${topic}" for today ${currentDate}. Create a news digest in Russian with English terms in parentheses. Include vocabulary explanations for key terms and format as a structured digest.`,
+        },
+      ]);
+    } catch (error) {
+      console.error("Ошибка при генерации кастомных новостей:", error);
+      return { text: "", error: error?.message || String(error) };
+    }
   }
 
   startDailyJob() {
@@ -109,69 +115,99 @@ Create a cheerful and engaging news digest in Russian with English terms in pare
     cron.schedule(
       "0 9 * * *",
       async () => {
-        console.log("Запуск утренней рассылки новостей");
-        await this.loadUserIds();
-        await this.sendNewsToAllUsers();
+        try {
+          console.log("Запуск утренней рассылки новостей");
+          await this.loadUserIds();
+          await this.sendNewsToAllUsers();
+        } catch (error) {
+          console.error("Ошибка утренней рассылки новостей:", error);
+        }
       },
       {
         timezone: "America/Los_Angeles",
-      }
+      },
     );
 
     // Вечерние новости в 22:00
     cron.schedule(
-      "47 20 * * *",
+      "0 22 * * *",
       async () => {
-        console.log("Запуск вечерней рассылки новостей");
-        await this.loadUserIds();
-        await this.sendNewsToAllUsers();
+        try {
+          console.log("Запуск вечерней рассылки новостей");
+          await this.loadUserIds();
+          await this.sendNewsToAllUsers();
+        } catch (error) {
+          console.error("Ошибка вечерней рассылки новостей:", error);
+        }
       },
       {
         timezone: "America/Los_Angeles",
-      }
+      },
     );
+  }
+
+  async sendWeeklyDigest() {
+    console.log("Запуск еженедельной сводки новостей...");
+    await this.loadUserIds();
+
+    let weeklyDigest;
+    try {
+      weeklyDigest = await handleOpenAiRequestWithWebSearch([
+        {
+          role: "system",
+          content: `Create a comprehensive weekly news digest in Russian with English terms. Cover the most important events of the past week across different categories: technology, economy, science, politics, and culture. Help Russian speakers learn English through current events.`,
+        },
+        {
+          role: "user",
+          content: `Create a weekly news digest for the past week. Include the most significant global events with English vocabulary notes.`,
+        },
+      ]);
+    } catch (error) {
+      console.error(
+        "Ошибка при генерации еженедельной сводки (OpenAI):",
+        error,
+      );
+      return;
+    }
+
+    if (!weeklyDigest?.text) {
+      console.error(
+        "Не удалось получить еженедельную сводку:",
+        weeklyDigest?.error || "Неизвестная ошибка",
+      );
+      return;
+    }
+
+    const weeklyMessage = `📰 Еженедельная сводка новостей от Дилана\n\n${escapeTelegramHtml(weeklyDigest.text)}`;
+    const bot = getTelegramBot();
+    for (const userId of this.userIds) {
+      try {
+        await sendMessageInChunks(bot.telegram, userId, weeklyMessage, {
+          parse_mode: "HTML",
+        });
+      } catch (error) {
+        console.error(
+          `Ошибка отправки еженедельной сводки пользователю ${userId}:`,
+          error,
+        );
+      }
+    }
   }
 
   startWeeklyJob() {
     // Еженедельная сводка по воскресеньям в 10:00
     cron.schedule(
-      "* 10 * * 0",
+      "0 10 * * 0",
       async () => {
-        console.log("Запуск еженедельной сводки новостей...");
-        await this.loadUserIds();
-
-        const weeklyDigest = await handleOpenAiRequestWithWebSearch([
-          {
-            role: "system",
-            content: `Create a comprehensive weekly news digest in Russian with English terms. Cover the most important events of the past week across different categories: technology, economy, science, politics, and culture. Help Russian speakers learn English through current events.`,
-          },
-          {
-            role: "user",
-            content: `Create a weekly news digest for the past week. Include the most significant global events with English vocabulary notes.`,
-          },
-        ]);
-
-        if (weeklyDigest && weeklyDigest.text) {
-          const weeklyMessage = `📰 Еженедельная сводка новостей от Дилана\n\n${weeklyDigest.text}`;
-
-          const bot = getTelegramBot();
-          for (const userId of this.userIds) {
-            try {
-              await sendMessageInChunks(bot.telegram, userId, weeklyMessage, {
-                parse_mode: "HTML",
-              });
-            } catch (error) {
-              console.error(
-                `Ошибка отправки еженедельной сводки пользователю ${userId}:`,
-                error
-              );
-            }
-          }
+        try {
+          await this.sendWeeklyDigest();
+        } catch (error) {
+          console.error("Ошибка еженедельной рассылки новостей:", error);
         }
       },
       {
         timezone: "America/Los_Angeles",
-      }
+      },
     );
   }
 }

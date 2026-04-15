@@ -87,6 +87,8 @@ class BotRateLimiter {
   }
 }
 
+export { BotRateLimiter };
+
 // Create bot rate limiter instance
 export const botRateLimiter = new BotRateLimiter(30, 60000); // 30 requests per minute
 

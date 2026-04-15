@@ -55,7 +55,7 @@ class OggConverter {
 
   // removed toOGG as unused
 
-  async create(url, filename, ext = "ogg") {
+  async create(url, filename) {
     try {
       const oggPath = resolve(__dirname, "../voices", `${filename}.ogg`);
       const response = await httpClient({
@@ -64,13 +64,15 @@ class OggConverter {
         responseType: "stream",
       });
 
-      return new Promise((resolve) => {
+      return new Promise((resolve, reject) => {
         const stream = createWriteStream(oggPath);
         response.data.pipe(stream);
         stream.on("finish", () => resolve(oggPath));
+        stream.on("error", reject);
       });
     } catch (e) {
       console.log("Error in create file", e.message);
+      throw e;
     }
   }
 }

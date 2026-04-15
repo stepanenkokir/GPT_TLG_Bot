@@ -6,7 +6,12 @@ import { apiRateLimiter } from "./middleware/rateLimiter.js";
 
 export function createHttpServer() {
   const app = express();
-  app.use(cors());
+  const allowedOrigin = getConfigValueWithDefault(
+    "webapp.baseUrl",
+    "WEBAPP_BASE_URL",
+    "*"
+  );
+  app.use(cors({ origin: allowedOrigin }));
   app.use(express.json());
 
   // Apply rate limiting to all API routes
