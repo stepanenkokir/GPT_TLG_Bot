@@ -4,9 +4,19 @@ import JokeSender from "./script/jokeSender.js";
 import NewsSender from "./script/newsSender.js";
 import { createHttpServer } from "./server.js";
 import { launchTelegramBot } from "./bot.js";
+import { getConfigValueWithDefault } from "./config/loader.js";
 
-// Launch HTTP API server
-createHttpServer();
+const realtimeEnabled = getConfigValueWithDefault(
+  "webapp.realtimeEnabled",
+  "REALTIME_ENABLED",
+  false
+);
+
+if (realtimeEnabled) {
+  createHttpServer();
+} else {
+  console.log("Realtime is disabled (REALTIME_ENABLED=false). WebApp server not started.");
+}
 
 // Launch Telegram bot
 launchTelegramBot();
