@@ -295,29 +295,28 @@ export const handleOpenAiVoice = async (filepath) => {
   }
 };
 
-export const createOpenAiImage = async (prompt, quality = false) => {
-  const resolveQuality = (q) =>
-    typeof q === "string"
-      ? q === "high"
-        ? "hd"
-        : "standard"
-      : q
-      ? "hd"
-      : "standard";
+export const createOpenAiImage = async (prompt, quality = "medium") => {
+  const resolveQuality = (q) => {
+    if (q === "high" || q === "hd") return "high";
+    if (q === "low") return "low";
+    return "medium";
+  };
 
   try {
     const resp = await requestWithRetry(() =>
       globalOpenAI.images.generate({
-        model: "dall-e-3",
+        model: "gpt-image-1-mini",
         prompt,
         size: "1024x1024",
         quality: resolveQuality(quality),
         n: 1,
       })
     );
-    return { url: resp.data?.[0]?.url || null };
+    const b64 = resp.data?.[0]?.b64_json || null;
+    if (!b64) return { buffer: null };
+    return { buffer: Buffer.from(b64, "base64") };
   } catch (e) {
     handleError(e, { operation: "createOpenAiImage" });
-    return { url: null, error: e.message };
+    return { buffer: null, error: e.message };
   }
 };

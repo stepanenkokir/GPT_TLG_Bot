@@ -120,9 +120,8 @@ const textHandler = async (ctx, userMessage) => {
       await ctx.telegram.sendChatAction(ctx.chat.id, "upload_photo");
       const response = await createOpenAiImage(userMessage);
       ctx.session.parametres.drawImage = false;
-      const imageUrl = response?.url || null;
-      if (imageUrl && /^https?:\/\//i.test(imageUrl)) {
-        await ctx.replyWithPhoto(imageUrl);
+      if (response?.buffer) {
+        await ctx.replyWithPhoto({ source: response.buffer });
       } else {
         const { message } = handleError(
           new Error(response?.error || "Image generation failed"),
