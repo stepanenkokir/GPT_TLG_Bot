@@ -117,9 +117,18 @@ const textHandler = async (ctx, userMessage) => {
     }
 
     if (ctx.session.parametres.drawImage) {
-      await ctx.telegram.sendChatAction(ctx.chat.id, "upload_photo");
-      const response = await createOpenAiImage(userMessage);
       ctx.session.parametres.drawImage = false;
+      const chatActionInterval = setInterval(
+        () => ctx.telegram.sendChatAction(ctx.chat.id, "upload_photo").catch(() => {}),
+        4000
+      );
+      await ctx.telegram.sendChatAction(ctx.chat.id, "upload_photo");
+      let response;
+      try {
+        response = await createOpenAiImage(userMessage);
+      } finally {
+        clearInterval(chatActionInterval);
+      }
       if (response?.buffer) {
         await ctx.replyWithPhoto({ source: response.buffer });
       } else {
@@ -171,8 +180,11 @@ const textHandler = async (ctx, userMessage) => {
 
       const verbosityKey = ctx.session.parametres.verbosity ?? DEFAULT_VERBOSITY;
       const verbosityConfig = menu.VERBOSITY_LEVELS[verbosityKey] ?? menu.VERBOSITY_LEVELS[DEFAULT_VERBOSITY];
+      const hasImage = ctx.session.messages.some(
+        (m) => Array.isArray(m.content) && m.content.some((p) => p?.type === "image_url")
+      );
       const openAiOptions = {
-        maxTokens: verbosityConfig.tokens,
+        maxTokens: hasImage ? Math.max(verbosityConfig.tokens, 2000) : verbosityConfig.tokens,
         verbosityHint: verbosityConfig.hint,
       };
 
@@ -356,7 +368,6 @@ export function setupBotCommands(bot) {
       }
 
       if (ctx.message.photo) {
-        await ctx.telegram.sendChatAction(ctx.chat.id, "upload_photo");
         const caption = ctx.message.caption
           ? ctx.message.caption
           : "Фото из публичного доступа. Попробуй рассказать что изображено на этом фото. Это не приватная информация.";
@@ -374,15 +385,25 @@ export function setupBotCommands(bot) {
             { type: "image_url", image_url: { url: photoUrl.href } },
           ],
         });
-        
-        // Trim messages before sending to OpenAI
-        const trimmedMessages = trimMessages(ctx.session.messages);
-        const { text: photoResp, error: photoErr } = await handleOpenAiRequest(
-          trimmedMessages
+
+        const chatActionInterval = setInterval(
+          () => ctx.telegram.sendChatAction(ctx.chat.id, "upload_photo").catch(() => {}),
+          4000
         );
-        await ctx.reply(
-          photoErr ? `Ошибка: ${photoErr}` : photoResp || "Пустой ответ"
-        );
+        await ctx.telegram.sendChatAction(ctx.chat.id, "upload_photo");
+
+        try {
+          const trimmedMessages = trimMessages(ctx.session.messages);
+          const { text: photoResp, error: photoErr } = await handleOpenAiRequest(
+            trimmedMessages,
+            { maxTokens: 4000 }
+          );
+          await ctx.reply(
+            photoErr ? `Ошибка: ${photoErr}` : photoResp || "Пустой ответ"
+          );
+        } finally {
+          clearInterval(chatActionInterval);
+        }
       }
     } catch (error) {
       const { message } = handleError(error, {

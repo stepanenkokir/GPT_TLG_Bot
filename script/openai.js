@@ -54,10 +54,10 @@ const toChatMessages = (messages) =>
               return { type: "text", text: part.text };
             }
             if (part?.type === "image_url") {
-              return {
-                type: "image_url",
-                image_url: part.image_url?.url || part.image_url,
-              };
+              const url = typeof part.image_url === "string"
+                ? part.image_url
+                : part.image_url?.url;
+              return { type: "image_url", image_url: { url } };
             }
             return {
               type: "text",
@@ -180,15 +180,30 @@ export const handleOpenAiRequest = async (messages, options = {}) => {
       }
     }
 
+    const completionParams = {
+      model,
+      messages: chatMessages,
+    };
+    if (options.maxTokens) {
+      completionParams.max_completion_tokens = options.maxTokens;
+    }
+
     const resp = await requestWithRetry(() =>
-      globalOpenAI.chat.completions.create({
-        model,
-        messages: chatMessages,
-        max_completion_tokens: options.maxTokens ?? 1000,
-      })
+      globalOpenAI.chat.completions.create(completionParams)
     );
 
-    return { text: extractTextFromResponse(resp) };
+    const text = extractTextFromResponse(resp);
+    if (!text) {
+      console.warn(
+        "[openai] Empty text extracted.",
+        "finish_reason:", resp?.choices?.[0]?.finish_reason,
+        "raw content:", JSON.stringify(resp?.choices?.[0]?.message?.content),
+        "usage:", JSON.stringify(resp?.usage),
+        "messages_count:", chatMessages.length,
+        "max_tokens:", options.maxTokens ?? 1000
+      );
+    }
+    return { text };
   } catch (e) {
     handleError(e, { operation: "handleOpenAiRequest" });
     return { text: "", error: e.message };
