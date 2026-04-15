@@ -13,6 +13,8 @@ import { signWebToken } from "../utils/webToken.js";
 import { replyInChunks } from "./telegramUtils.js";
 import { handleError } from "../utils/errorHandler.js";
 
+const DEFAULT_VERBOSITY = "medium";
+
 const roles = {
   ASSISTANT: "assistant",
   USER: "user",
@@ -34,6 +36,7 @@ const defaultParameters = () => ({
   drawImage: false,
   voiceLang: "Russian",
   useWebSearch: false,
+  verbosity: DEFAULT_VERBOSITY,
 });
 
 // Maximum number of messages to keep in history (excluding system message)
@@ -167,11 +170,18 @@ const textHandler = async (ctx, userMessage) => {
       // Trim messages before sending to OpenAI to prevent history from growing too large
       const trimmedMessages = trimMessages(ctx.session.messages);
 
+      const verbosityKey = ctx.session.parametres.verbosity ?? DEFAULT_VERBOSITY;
+      const verbosityConfig = menu.VERBOSITY_LEVELS[verbosityKey] ?? menu.VERBOSITY_LEVELS[DEFAULT_VERBOSITY];
+      const openAiOptions = {
+        maxTokens: verbosityConfig.tokens,
+        verbosityHint: verbosityConfig.hint,
+      };
+
       const useWeb = Boolean(ctx.session.parametres.useWebSearch);
       const handler = useWeb
         ? handleOpenAiRequestWithWebSearch
         : handleOpenAiRequest;
-      const { text, error } = await handler(trimmedMessages);
+      const { text, error } = await handler(trimmedMessages, openAiOptions);
 
       if (error) {
         const { message } = handleError(new Error(error), {
@@ -259,6 +269,16 @@ export function setupBotCommands(bot) {
     );
   });
 
+  bot.hears(menu.menuVerbosity, async (ctx) => {
+    await checkSession(ctx);
+    const current = ctx.session.parametres.verbosity ?? DEFAULT_VERBOSITY;
+    const currentLabel = menu.VERBOSITY_LEVELS[current]?.label ?? current;
+    await ctx.reply(
+      `Текущая детализация ответов: <b>${currentLabel}</b>\nВыбери уровень:`,
+      { parse_mode: "HTML", ...menu.buildVerbosityInlineKeyboard(current) }
+    );
+  });
+
   if (menu.isRealtimeEnabled) {
     bot.hears(menu.menuRealtime, async (ctx) => {
       await checkSession(ctx);
@@ -282,6 +302,21 @@ export function setupBotCommands(bot) {
     const userMessage = ctx.message.text;
     await textHandler(ctx, userMessage);
   });
+
+  // Обработка инлайн-кнопок выбора детализации
+  for (const key of Object.keys(menu.VERBOSITY_LEVELS)) {
+    bot.action(`set_verbosity_${key}`, async (ctx) => {
+      await checkSession(ctx);
+      ctx.session.parametres.verbosity = key;
+      const label = menu.VERBOSITY_LEVELS[key].label;
+      try {
+        await ctx.editMessageReplyMarkup(
+          menu.buildVerbosityInlineKeyboard(key).reply_markup
+        );
+      } catch (_) {}
+      await ctx.answerCbQuery(`Детализация: ${label}`, { show_alert: false });
+    });
+  }
 
   // Обработка инлайн-кнопки переключения Web Search
   bot.action("toggle_websearch", async (ctx) => {

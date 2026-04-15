@@ -114,6 +114,17 @@ const extractTextFromResponse = (resp) => {
     }
   }
 
+  // Responses API: resp.output — массив блоков { type: "message", content: [...] }
+  if (Array.isArray(resp.output)) {
+    const text = resp.output
+      .flatMap((block) => (Array.isArray(block?.content) ? block.content : []))
+      .filter((part) => part?.type === "output_text" && part?.text)
+      .map((part) => part.text)
+      .join("")
+      .trim();
+    if (text.length > 0) return text;
+  }
+
   // Фоллбэк для других форматов
   if (resp.output_text) {
     return Array.isArray(resp.output_text)
@@ -131,7 +142,7 @@ const isRetryableError = (error) => {
   return /timeout|ETIMEDOUT|network|fetch failed|socket hang up/i.test(message);
 };
 
-// Универсальный запрос с ретраем
+// Универсальный запрос с ретраем и экспоненциальной задержкой
 const requestWithRetry = async (fn, retries = 2) => {
   let lastErr;
   for (let i = 0; i <= retries; i++) {
@@ -140,31 +151,40 @@ const requestWithRetry = async (fn, retries = 2) => {
     } catch (err) {
       lastErr = err;
       if (!isRetryableError(err) || i === retries) throw err;
+      const delay = Math.min(1000 * 2 ** i, 8000);
+      await new Promise((res) => setTimeout(res, delay));
     }
   }
   throw lastErr;
 };
 
 // ===== Основные методы =====
-export const handleOpenAiRequest = async (messages) => {
+export const handleOpenAiRequest = async (messages, options = {}) => {
   try {
-    // Validate messages before processing
     const validation = validateMessages(messages);
     if (!validation.valid) {
-      return {
-        text: "",
-        error: `Invalid messages format: ${validation.error}`,
-      };
+      return { text: "", error: `Invalid messages format: ${validation.error}` };
     }
 
     const model = getModel();
-    const chatMessages = toChatMessages(messages);
+    let chatMessages = toChatMessages(messages);
+
+    if (options.verbosityHint) {
+      const systemIdx = chatMessages.findIndex((m) => m.role === "system");
+      if (systemIdx !== -1) {
+        chatMessages = chatMessages.map((m, i) =>
+          i === systemIdx
+            ? { ...m, content: `${m.content}\n\n[Response length instruction: ${options.verbosityHint}]` }
+            : m
+        );
+      }
+    }
 
     const resp = await requestWithRetry(() =>
       globalOpenAI.chat.completions.create({
         model,
         messages: chatMessages,
-        max_completion_tokens: 2000, // Reduced from 2000 to speed up responses
+        max_completion_tokens: options.maxTokens ?? 1000,
       })
     );
 
@@ -181,19 +201,18 @@ export const handleOpenAiRequestWithWebSearch = async (
   options = {}
 ) => {
   try {
-    // Validate messages before processing
     const validation = validateMessages(messages);
     if (!validation.valid) {
-      return {
-        text: "",
-        error: `Invalid messages format: ${validation.error}`,
-      };
+      return { text: "", error: `Invalid messages format: ${validation.error}` };
     }
 
     const model = getModel();
 
     // Преобразуем сообщения в единый текстовый ввод для Responses API
     const chatMessages = toChatMessages(messages);
+    const verbosityLine = options.verbosityHint
+      ? `\n\n[Response length instruction: ${options.verbosityHint}]`
+      : "";
     const input = chatMessages
       .map((m) => {
         const content = Array.isArray(m.content)
@@ -203,7 +222,7 @@ export const handleOpenAiRequestWithWebSearch = async (
               .join("\n")
           : String(m.content || "");
         const role = m.role || "user";
-        if (role === "system") return `System: ${content}`;
+        if (role === "system") return `System: ${content}${verbosityLine}`;
         if (role === "assistant") return `Assistant: ${content}`;
         return `User: ${content}`;
       })
