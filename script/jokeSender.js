@@ -1,100 +1,66 @@
-// Файл: jokeSender.js
-import fs from "fs/promises";
 import cron from "node-cron";
-import { handleOpenAiRequest } from "./openai.js";
-import { Telegraf } from "telegraf";
-import config from "config";
+import axios from "axios";
+import { XMLParser } from "fast-xml-parser";
+import { getTelegramBot } from "./telegramBotInstance.js";
+import { BaseSender } from "./baseSender.js";
 
-// Инициализация бота для отправки сообщений
-const botToken = config.get("telegramBot.token");
-const bot = new Telegraf(botToken);
+const RSS_URL = "https://anekdot.ru/rss/export_o.xml";
+const xmlParser = new XMLParser({ ignoreAttributes: false });
 
-// Класс для рассылки анекдотов
-class JokeSender {
+class JokeSender extends BaseSender {
   constructor(filePath) {
-    this.filePath = filePath;
-    this.userIds = [];
+    super(filePath);
   }
 
-  async loadUserIds() {
-    try {
-      const data = await fs.readFile(this.filePath, "utf-8");
-      this.userIds = JSON.parse(data);
-      console.log("Список пользователей загружен:", this.userIds);
-    } catch (error) {
-      console.error("Ошибка при загрузке списка пользователей:", error);
-    }
+  async #fetchStoryFromRss() {
+    const { data } = await axios.get(RSS_URL, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; TLGBot/1.0)" },
+      timeout: 10_000,
+    });
+    const parsed = xmlParser.parse(data);
+    const items = parsed?.rss?.channel?.item;
+    const first = Array.isArray(items) ? items[0] : items;
+    if (!first) throw new Error("RSS не содержит элементов");
+
+    const description = String(first.description ?? "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .trim();
+
+    return { description };
   }
 
   async sendJokeToAllUsers() {
-    const themes = [
-      "Family Life – Jokes about the daily lives of spouses, in-law relationships (mother-in-law or father-in-law), and funny things kids say.",
-      'Work and Office – Workplace mishaps, funny coworkers, and bosses with a "great" sense of humor.',
-      "Everyday Nuances – Home repairs, shopping, utility services, and neighborly conversations.",
-      "School and Studying – Teachers, exams, underachievers, pop quizzes, and school pranks.",
-      "Medical Humor – Patients and doctors, funny diagnoses, and questionable medical advice.",
-      "Animals and Their Personalities – Cats as wise beings, sneaky dogs, and talkative parrots.",
-      "Modern Technology – Gadgets, the internet, social media, Zoom fails, and chat mishaps.",
-      "Sports and Fitness – Beginner athletes, gym workouts, and failed diet attempts.",
-      "Travel and Tourism – Packing suitcases, vacation resorts, guided tours, and unexpected travel adventures.",
-      "Coincidences and Randomness – Unexpected encounters, funny situations on public transport or the street.",
-      "Dating and Relationships – Awkward first dates, online dating fails, and relationship quirks.",
-      "Social Media Trends – Viral challenges, TikTok fails, and influencer culture.",
-      "Gaming and Gamers – Glitches, rage quits, and funny in-game moments.",
-      "Food and Cooking – Kitchen disasters, weird food combinations, and restaurant mishaps.",
-      "Politics and Current Events – Satirical takes on politicians, elections, and global news.",
-      "Celebrities and Pop Culture – Celebrity gossip, award show blunders, and movie/TV references.",
-      "Environmental Issues – Climate change jokes, recycling fails, and eco-friendly struggles.",
-      "Remote Work Life – Working from home, Zoom meetings in pajamas, and dealing with distractions.",
-      "Parenting Challenges – Sleep-deprived parents, toddler tantrums, and school projects gone wrong.",
-      "Fitness Trends – Yoga fails, Peloton mishaps, and over-the-top health fads.",
-    ];
-
-    const currTheme = themes[Math.floor(Math.random() * themes.length)];
-    // Генерация анекдота
-    const jokeResponse = await handleOpenAiRequest([
-      {
-        role: "system",
-        content: `You're an awesome Eanglish teacher for russians and also joke teller. You create short, hilarious jokes on any topic. First, you translate the joke into Russian, keeping in mind modern Russian slang and cultural references, and then in new line you include the original English version in parentheses. `,
-      },
-      {
-        role: "user",
-        content: `Расскажи новый смешной анекдот: ${currTheme} и объясни его соль по русски если есть игра слов в английском варианте`,
-      },
-      {
-        role: "user",
-        content: `Закончи позитивной фразой и добавь, что жаждешь общения и готов отвечать на вопросы`,
-      },
-    ]);
-
-    if (!jokeResponse || !jokeResponse.text) {
-      console.error(
-        "Не удалось получить анекдот:",
-        jokeResponse?.error || "Неизвестная ошибка"
-      );
+    let story;
+    try {
+      story = await this.#fetchStoryFromRss();
+    } catch (error) {
+      console.error("Ошибка загрузки RSS anekdot.ru:", error.message);
       return;
     }
 
-    const sendMessage = `Учим английский по анекдотам от Дилана\n\n${jokeResponse.text}`;
+    const { description } = story;
+    const sendMessage = description;
 
-    // Отправка анекдота всем пользователям
+    const bot = getTelegramBot();
     for (const userId of this.userIds) {
       try {
         await bot.telegram.sendMessage(userId, sendMessage);
-        console.log(`Анекдот отправлен пользователю ${userId}`);
+        console.log(`История отправлена пользователю ${userId}`);
       } catch (error) {
         console.error(
-          `Ошибка отправки анекдота пользователю ${userId}:`,
-          error
+          `Ошибка отправки истории пользователю ${userId}:`,
+          error.message,
         );
       }
     }
   }
 
   startDailyJob() {
-    console.log("Start some at ", new Date());
+    console.log("Start joke sender at ", new Date());
+
     cron.schedule(
-      "8 8 * * *",
+      "5 8 * * *",
       async () => {
         console.log("Запуск ежедневной отправки анекдотов в 8 утра...");
         await this.loadUserIds();
@@ -102,7 +68,7 @@ class JokeSender {
       },
       {
         timezone: "America/Los_Angeles",
-      }
+      },
     );
   }
 }

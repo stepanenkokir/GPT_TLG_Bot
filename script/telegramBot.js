@@ -8,9 +8,10 @@ import {
 } from "./openai.js";
 import { ogg } from "./ogg.js";
 import * as menu from "./tlgBotMenu.js";
-import config from "config";
-import { createHmac } from "crypto";
+import { getConfigValue, getConfigValueWithDefault } from "../config/loader.js";
+import { signWebToken } from "../utils/webToken.js";
 import { replyInChunks } from "./telegramUtils.js";
+import { handleError } from "../utils/errorHandler.js";
 
 const roles = {
   ASSISTANT: "assistant",
@@ -34,6 +35,33 @@ const defaultParameters = () => ({
   voiceLang: "Russian",
   useWebSearch: false,
 });
+
+// Maximum number of messages to keep in history (excluding system message)
+const MAX_MESSAGES = 20;
+
+/**
+ * Trim messages history to prevent it from growing too large
+ * Keeps system message and last N messages
+ * @param {Array} messages - Array of messages
+ * @returns {Array} Trimmed messages array
+ */
+const trimMessages = (messages) => {
+  if (!Array.isArray(messages) || messages.length <= MAX_MESSAGES + 1) {
+    return messages;
+  }
+
+  // Find system message
+  const systemMessage = messages.find((m) => m.role === roles.SYSTEM);
+  const otherMessages = messages.filter((m) => m.role !== roles.SYSTEM);
+
+  // Keep last MAX_MESSAGES messages
+  const recentMessages = otherMessages.slice(-MAX_MESSAGES);
+
+  // Reconstruct with system message first
+  return systemMessage
+    ? [systemMessage, ...recentMessages]
+    : recentMessages;
+};
 
 const setRole = async (ctx) => {
   await checkSession(ctx);
@@ -69,7 +97,7 @@ const checkSession = async (ctx) => {
     return false;
   }
   const currentTime = new Date();
-  if (currentTime - new Date(ctx.session.created) > 5 * 60 * 1000) {
+  if (currentTime - new Date(ctx.session.created) > 60 * 60 * 1000) {
     await createNewSession(ctx);
     return false;
   }
@@ -93,10 +121,15 @@ const textHandler = async (ctx, userMessage) => {
       if (imageUrl && /^https?:\/\//i.test(imageUrl)) {
         await ctx.replyWithPhoto(imageUrl);
       } else {
-        const errorText = response?.error
-          ? `Не удалось получить изображение: ${response.error}`
-          : "Не удалось получить изображение";
-        await ctx.reply(errorText);
+        const { message } = handleError(
+          new Error(response?.error || "Image generation failed"),
+          {
+            operation: "createOpenAiImage",
+            context: { chatId: ctx.chat.id },
+            customMessage: "Не удалось получить изображение. Попробуйте позже.",
+          }
+        );
+        await ctx.reply(message);
       }
       return;
     }
@@ -105,7 +138,10 @@ const textHandler = async (ctx, userMessage) => {
       await ctx.telegram.sendChatAction(ctx.chat.id, "record_voice");
       const requestString = `${userMessage} Отвечай, пожалуйста на ${ctx.session.parametres.voiceLang} язык`;
       ctx.session.messages.push({ role: roles.USER, content: requestString });
-      const response = await handleOpenAiRequestVoice(ctx.session.messages);
+      
+      // Trim messages before sending to OpenAI
+      const trimmedMessages = trimMessages(ctx.session.messages);
+      const response = await handleOpenAiRequestVoice(trimmedMessages, ctx.chat.id);
       if (response?.text) {
         ctx.session.messages.push({
           role: roles.ASSISTANT,
@@ -113,21 +149,36 @@ const textHandler = async (ctx, userMessage) => {
         });
         await ctx.replyWithVoice({ source: response.buffer });
       } else {
-        await ctx.reply("Что-то я устал, надо поспать... Давай позже");
+        const { message } = handleError(
+          new Error(response?.error || "Voice generation failed"),
+          {
+            operation: "handleOpenAiRequestVoice",
+            context: { chatId: ctx.chat.id },
+            customMessage: "Что-то я устал, надо поспать... Давай позже",
+          }
+        );
+        await ctx.reply(message);
       }
     } else {
       // Simple text reply with typing action
       await ctx.telegram.sendChatAction(ctx.chat.id, "typing");
       ctx.session.messages.push({ role: roles.USER, content: userMessage });
 
+      // Trim messages before sending to OpenAI to prevent history from growing too large
+      const trimmedMessages = trimMessages(ctx.session.messages);
+
       const useWeb = Boolean(ctx.session.parametres.useWebSearch);
       const handler = useWeb
         ? handleOpenAiRequestWithWebSearch
         : handleOpenAiRequest;
-      const { text, error } = await handler(ctx.session.messages);
+      const { text, error } = await handler(trimmedMessages);
 
       if (error) {
-        await replyInChunks(ctx, `Ошибочка вышла: ${error}`);
+        const { message } = handleError(new Error(error), {
+          operation: "handleOpenAiRequest",
+          context: { chatId: ctx.chat.id, useWebSearch: useWeb },
+        });
+        await replyInChunks(ctx, message);
       } else if (text && text.trim().length > 0) {
         ctx.session.messages.push({
           role: roles.ASSISTANT,
@@ -142,7 +193,11 @@ const textHandler = async (ctx, userMessage) => {
       }
     }
   } catch (error) {
-    await ctx.reply(`Ошибочка вышла: ${error.message}`);
+    const { message } = handleError(error, {
+      operation: "textHandler",
+      context: { chatId: ctx.chat.id },
+    });
+    await ctx.reply(message);
   }
 };
 
@@ -180,8 +235,8 @@ const backMsg = async (ctx) => {
 export function setupBotCommands(bot) {
   bot.start(async (ctx) => {
     console.log(`Start bot for ${ctx.chat.id}`);
-    createNewSession(ctx);
-    welcomeMsg(ctx);
+    await createNewSession(ctx);
+    await welcomeMsg(ctx);
   });
 
   bot.hears(menu.menuNewSession, async (ctx) => await createNewSession(ctx));
@@ -207,22 +262,13 @@ export function setupBotCommands(bot) {
   // Realtime mini-app open button
   bot.hears(menu.menuRealtime, async (ctx) => {
     await checkSession(ctx);
-    const baseUrl = (() => {
-      try {
-        const v = config.get("webapp.baseUrl");
-        if (typeof v === "string" && v.trim().length > 0) return v.trim();
-      } catch (_) {}
-      return "http://localhost:3000";
-    })();
-    const signWebToken = (payload) => {
-      const secret = config.get("telegramBot.token");
-      const exp = Math.floor(Date.now() / 1000) + 60; // 1 минута на открытие
-      const data = { ...payload, exp };
-      const body = Buffer.from(JSON.stringify(data)).toString("base64url");
-      const sig = createHmac("sha256", secret).update(body).digest("base64url");
-      return `${body}.${sig}`;
-    };
-    const token = signWebToken({ uid: ctx.from.id });
+    const baseUrl = getConfigValueWithDefault(
+      "webapp.baseUrl",
+      "WEBAPP_BASE_URL",
+      "http://localhost:3000"
+    );
+    const secret = getConfigValue("telegramBot.token", "TELEGRAM_BOT_TOKEN");
+    const token = signWebToken({ uid: ctx.from.id }, secret, 60);
     const url = `${baseUrl}/?t=${encodeURIComponent(token)}`;
     await ctx.reply(
       "Открыть мини‑приложение Realtime",
@@ -261,10 +307,17 @@ export function setupBotCommands(bot) {
         const oggLink = await ctx.telegram.getFileLink(
           ctx.message.voice.file_id
         );
-        const oggPath = await ogg.create(oggLink.href, userId, "ogg");
+        const oggPath = await ogg.create(oggLink.href, userId);
         const mp3Path = await ogg.toMP3(oggPath, userId);
-        const { text } = await handleOpenAiVoice(mp3Path);
-        await textHandler(ctx, text);
+        try {
+          const { text } = await handleOpenAiVoice(mp3Path);
+          await textHandler(ctx, text);
+        } finally {
+          // Cleanup temporary files
+          await ogg.removeFile(mp3Path).catch(() => {});
+          // oggPath is already removed by toMP3, but ensure cleanup
+          await ogg.removeFile(oggPath).catch(() => {});
+        }
       }
 
       if (ctx.message.photo) {
@@ -286,15 +339,22 @@ export function setupBotCommands(bot) {
             { type: "image_url", image_url: { url: photoUrl.href } },
           ],
         });
+        
+        // Trim messages before sending to OpenAI
+        const trimmedMessages = trimMessages(ctx.session.messages);
         const { text: photoResp, error: photoErr } = await handleOpenAiRequest(
-          ctx.session.messages
+          trimmedMessages
         );
         await ctx.reply(
           photoErr ? `Ошибка: ${photoErr}` : photoResp || "Пустой ответ"
         );
       }
     } catch (error) {
-      console.log("Error message where bot.message ", error.message);
+      const { message } = handleError(error, {
+        operation: "bot.message handler",
+        context: { userId: ctx.chat?.id },
+      });
+      await ctx.reply(message).catch(() => {}); // Ignore errors when replying about errors
     }
   });
 }

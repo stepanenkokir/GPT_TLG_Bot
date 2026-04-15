@@ -1,5 +1,13 @@
 export const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 
+/** Экранирование для Telegram Bot API parse_mode: HTML */
+export function escapeTelegramHtml(text) {
+  return String(text ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 export function splitTextIntoChunks(text, limit = TELEGRAM_MAX_MESSAGE_LENGTH) {
   if (typeof text !== "string") text = String(text ?? "");
   if (text.length <= limit) return [text];

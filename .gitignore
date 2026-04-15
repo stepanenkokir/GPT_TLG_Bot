@@ -1,6 +1,7 @@
-/config
+/config/*.local.json
 /log
 /voices/*.ogg
 /voices/*.mp3
 /node_modules
 *.txt
+.env

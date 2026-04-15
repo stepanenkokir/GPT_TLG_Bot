@@ -1,34 +1,26 @@
 import express from "express";
-import axios from "axios";
+import { httpClient } from "../utils/httpClient.js";
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
-import config from "config";
+import { getConfigValue, getConfigValueWithDefault } from "../config/loader.js";
 import { createHmac } from "crypto";
+import { verifyWebToken } from "../utils/webToken.js";
+import { VOICE_ROLES } from "../config/voiceRoles.js";
 import { isUserAuthorized } from "../middleware/checkAuthUser.js";
-import { Telegraf } from "telegraf";
+import { getTelegramBot } from "../script/telegramBotInstance.js";
 import { sendMessageInChunks } from "../script/telegramUtils.js";
+import { validateRole, validateTextMessage } from "../middleware/validators.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const ProfessorVoice = `You are Professor Dylan, you understand medicine and can give useful health and treatment advice. Keep answers short, no more than 20 words. Note: Default response language is Russian.`;
+const MODEL = getConfigValueWithDefault(
+  "openai.realtimeModel",
+  "OPENAI_REALTIME_MODEL",
+  "gpt-4o-realtime-preview-2025-06-03"
+);
 
-const TeacherVoice = `You are Teacher Dylan, you explain any topics in language accessible to children 5-7 years old. Keep answers short, no more than 20 words. Note: Default response language is Russian.`;
-
-const HooliGanVoice = `You are the cheeky hooligan Dylan, you can speak different languages, and you can be very funny and cheerful. 
-And add hooligan words to your vocabulary. Keep answers short, no more than 10 words. Note: Default response language is Russian.`;
-
-const DylanVoice = `You are sarcastic Dylan, you can be very sarcastic and funny. Keep answers short, no more than 20 words. Note: Default response language is Russian.`;
-
-const MODEL = (() => {
-  try {
-    return config.get("openai.realtimeModel");
-  } catch (_) {
-    return "gpt-4o-realtime-preview-2025-06-03";
-  }
-})();
-
-const API_KEY = config.get("openai.apiKey");
+const API_KEY = getConfigValue("openai.apiKey", "OPENAI_API_KEY");
 
 function verifyInitData(raw, botToken) {
   if (!raw || typeof raw !== "string") return { ok: false };
@@ -62,34 +54,26 @@ function verifyInitData(raw, botToken) {
   return { ok: true, userId, userName };
 }
 
-function verifyWebToken(t, botToken) {
-  if (!t) return null;
-  const [body, sig] = String(t).split(".");
-  if (!body || !sig) return null;
-  const expected = createHmac("sha256", botToken)
-    .update(body)
-    .digest("base64url");
-  if (expected !== sig) return null;
-  try {
-    const data = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
-    if (
-      typeof data?.exp !== "number" ||
-      data.exp < Math.floor(Date.now() / 1000)
-    )
-      return null;
-    return data;
-  } catch (_) {
-    return null;
-  }
-}
 
 export function registerApiRoutes(app) {
-  const botToken = config.get("telegramBot.token");
-  const testMode = config.has("webapp.TEST_MODE")
-    ? config.get("webapp.TEST_MODE")
-    : false;
+  const botToken = getConfigValue("telegramBot.token", "TELEGRAM_BOT_TOKEN");
+  const testMode = getConfigValueWithDefault(
+    "webapp.TEST_MODE",
+    "WEBAPP_TEST_MODE",
+    false
+  );
 
-  const bot = new Telegraf(botToken);
+  const bot = getTelegramBot();
+
+  // Health check endpoint
+  app.get("/health", (req, res) => {
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: process.env.npm_package_version || "1.0.0",
+    });
+  });
 
   // Gate index page: allow only inside Telegram WebApp and authorized users
   app.get(["/", "/index.html"], (req, res) => {
@@ -126,10 +110,12 @@ export function registerApiRoutes(app) {
         }
       }
 
-      const { role, voice, name } = req.body;
+      const { role, voice } = req.body;
 
-      if (!role || !voice || !name) {
-        return res.status(400).json({ error: "Missing role data" });
+      // Validate role data
+      const validation = validateRole({ role, voice });
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error });
       }
 
       // Получаем имя пользователя из initData, если доступно
@@ -137,24 +123,7 @@ export function registerApiRoutes(app) {
         ? "Kirill"
         : verification?.userName || "Unknown";
 
-      const roleInstruction = role;
-
-      let voiceInstruction = DylanVoice;
-      switch (role) {
-        case "doctor":
-          voiceInstruction = ProfessorVoice;
-          break;
-        case "teacher":
-          voiceInstruction = TeacherVoice;
-          break;
-        case "hooligan":
-          voiceInstruction = HooliGanVoice;
-          break;
-
-        default:
-          voiceInstruction = DylanVoice;
-          break;
-      }
+      const voiceInstruction = VOICE_ROLES[role] ?? VOICE_ROLES.default;
 
       const resp = await fetch("https://api.openai.com/v1/realtime/sessions", {
         method: "POST",
@@ -165,7 +134,7 @@ export function registerApiRoutes(app) {
         body: JSON.stringify({
           model: MODEL,
           voice: voice,
-          instructions: `User: ${telegramUserName}. ${roleInstruction} ${voiceInstruction}`,
+          instructions: `User: ${telegramUserName}. ${voiceInstruction}`,
           input_audio_format: "pcm16",
           output_audio_format: "pcm16",
           input_audio_transcription: {
@@ -188,26 +157,40 @@ export function registerApiRoutes(app) {
   });
 
   app.post("/api/realtime-message", express.json(), async (req, res) => {
-    const { text } = req.body;
-    const initData = req.header("x-telegram-init-data") || "";
-    const verification = testMode
-      ? { userId: config.get("webapp.testId"), ok: true }
-      : verifyInitData(initData, botToken);
-    const userIdToCheck = verification.userId;
+    try {
+      // Validate text message
+      const validation = validateTextMessage(req.body);
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error });
+      }
 
-    if (
-      !verification.ok ||
-      !userIdToCheck ||
-      !isUserAuthorized(userIdToCheck)
-    ) {
-      return res.status(401).json({ error: "Unauthorized" });
+      const { text } = req.body;
+      const initData = req.header("x-telegram-init-data") || "";
+      const verification = testMode
+        ? {
+            userId: getConfigValue("webapp.testId", "WEBAPP_TEST_ID"),
+            ok: true,
+          }
+        : verifyInitData(initData, botToken);
+      const userIdToCheck = verification.userId;
+
+      if (
+        !verification.ok ||
+        !userIdToCheck ||
+        !isUserAuthorized(userIdToCheck)
+      ) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      await sendMessageInChunks(bot.telegram, userIdToCheck, text, {
+        parse_mode: "HTML",
+        disable_web_page_preview: false,
+      });
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error in realtime-message:", error);
+      res.status(500).json({ error: "Failed to send message" });
     }
-
-    await sendMessageInChunks(bot.telegram, userIdToCheck, text, {
-      parse_mode: "HTML",
-      disable_web_page_preview: false,
-    });
-    res.json({ ok: true });
   });
 
   // Proxy WebRTC SDP exchange to OpenAI Realtime. Body is raw SDP text
@@ -243,9 +226,9 @@ export function registerApiRoutes(app) {
         const url = `https://api.openai.com/v1/realtime?model=${encodeURIComponent(
           MODEL
         )}`;
-        const oaResp = await axios.post(url, offerSdp, {
+        const oaResp = await httpClient.post(url, offerSdp, {
           headers: {
-            Authorization: req.headers.authorization,
+            Authorization: `Bearer ${API_KEY}`,
             "Content-Type": "application/sdp",
             "OpenAI-Beta": "realtime=v1",
           },

@@ -1,0 +1,20 @@
+{
+  "telegramBot": {
+    "token": "${TELEGRAM_BOT_TOKEN}"
+  },
+  "openai": {
+    "apiKey": "${OPENAI_API_KEY}",
+    "model_2": "${OPENAI_MODEL_2}",
+    "model": "${OPENAI_MODEL}",
+    "realtimeModel": "${OPENAI_REALTIME_MODEL}",
+    "voice": "${OPENAI_VOICE}"
+  },
+  "webapp": {
+    "baseUrl": "${WEBAPP_BASE_URL}",
+    "PORT": "${WEBAPP_PORT}",
+    "TEST_MODE": "${WEBAPP_TEST_MODE}",
+    "testId": "${WEBAPP_TEST_ID}"
+  },
+  "listUsers": "${LIST_USERS_PATH}",
+  "adminId": "${ADMIN_ID}"
+}

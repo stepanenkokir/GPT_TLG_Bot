@@ -1,7 +1,9 @@
 import fs from "fs/promises";
 import { resolve } from "path";
 
-let authorizedUsers = []; // Initialize authorized users list
+let authorizedUsers = [];
+let lastLoadedAt = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000; // перезагружать не чаще раза в 5 минут
 
 const AUTH_FILE_PATH = resolve(process.cwd(), "authorizedUsers.txt");
 
@@ -12,10 +14,7 @@ const ensureAuthorizedUsersFileExists = async () => {
     if (err && err.code === "ENOENT") {
       await fs.writeFile(AUTH_FILE_PATH, "[]", "utf-8");
     } else {
-      console.error(
-        "Ошибка доступа к файлу авторизованных пользователей:",
-        err
-      );
+      console.error("Error accessing authorized users file:", err);
     }
   }
 };
@@ -25,26 +24,33 @@ const loadAuthorizedUsers = async () => {
     await ensureAuthorizedUsersFileExists();
     const data = await fs.readFile(AUTH_FILE_PATH, "utf-8");
     try {
-      authorizedUsers = JSON.parse(data);
-      if (!Array.isArray(authorizedUsers)) {
-        authorizedUsers = [];
+      const parsed = JSON.parse(data);
+      authorizedUsers = Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) {
         await fs.writeFile(AUTH_FILE_PATH, "[]", "utf-8");
       }
-    } catch (parseErr) {
-      // Если файл повреждён — переинициализируем
+    } catch {
       authorizedUsers = [];
       await fs.writeFile(AUTH_FILE_PATH, "[]", "utf-8");
     }
+    lastLoadedAt = Date.now();
   } catch (err) {
-    console.error("Ошибка при загрузке авторизованных пользователей:", err);
+    console.error("Error loading authorized users:", err);
   }
 };
 
-// Load the authorized users initially
+const loadIfStale = async () => {
+  if (Date.now() - lastLoadedAt > CACHE_TTL_MS) {
+    await loadAuthorizedUsers();
+  }
+};
+
+// Load initially
 loadAuthorizedUsers();
 
 export const checkAuthUserImproved = async (ctx, next) => {
   try {
+    await loadIfStale();
     const userId = ctx.from.id;
     if (authorizedUsers.includes(userId)) {
       await next();
@@ -54,14 +60,14 @@ export const checkAuthUserImproved = async (ctx, next) => {
       );
     }
   } catch (err) {
-    console.error("Ошибка при проверке авторизации пользователя:", err);
+    console.error("Error checking user authorization:", err);
   }
 };
 
 export const isUserAuthorized = (userId) => {
   try {
     return authorizedUsers.includes(userId);
-  } catch (_) {
+  } catch {
     return false;
   }
 };
