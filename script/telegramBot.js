@@ -259,22 +259,23 @@ export function setupBotCommands(bot) {
     );
   });
 
-  // Realtime mini-app open button
-  bot.hears(menu.menuRealtime, async (ctx) => {
-    await checkSession(ctx);
-    const baseUrl = getConfigValueWithDefault(
-      "webapp.baseUrl",
-      "WEBAPP_BASE_URL",
-      "http://localhost:3000"
-    );
-    const secret = getConfigValue("telegramBot.token", "TELEGRAM_BOT_TOKEN");
-    const token = signWebToken({ uid: ctx.from.id }, secret, 60);
-    const url = `${baseUrl}/?t=${encodeURIComponent(token)}`;
-    await ctx.reply(
-      "Открыть мини‑приложение Realtime",
-      menu.buildRealtimeInlineKeyboard(url)
-    );
-  });
+  if (menu.isRealtimeEnabled) {
+    bot.hears(menu.menuRealtime, async (ctx) => {
+      await checkSession(ctx);
+      const baseUrl = getConfigValueWithDefault(
+        "webapp.baseUrl",
+        "WEBAPP_BASE_URL",
+        "http://localhost:3000"
+      );
+      const secret = getConfigValue("telegramBot.token", "TELEGRAM_BOT_TOKEN");
+      const token = signWebToken({ uid: ctx.from.id }, secret, 60);
+      const url = `${baseUrl}/?t=${encodeURIComponent(token)}`;
+      await ctx.reply(
+        "Открыть мини‑приложение Realtime",
+        menu.buildRealtimeInlineKeyboard(url)
+      );
+    });
+  }
 
   // Обработка сообщений
   bot.on("text", async (ctx) => {

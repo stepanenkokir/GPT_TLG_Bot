@@ -1,4 +1,5 @@
 import { Markup } from "telegraf";
+import { getConfigValueWithDefault } from "../config/loader.js";
 
 export const menuNewSession = "Новая сессия";
 export const menuRole = "Роль";
@@ -9,13 +10,19 @@ export const menuSelectText = "Отвечать текстом";
 export const menuRealtime = "Realtime";
 export const menuWebSearch = "Web Search";
 
+export const isRealtimeEnabled = getConfigValueWithDefault(
+  "webapp.realtimeEnabled",
+  "REALTIME_ENABLED",
+  false
+);
+
 const menuArr = [
   [menuNewSession],
   [menuRole],
   // голосовое меню скрыто, не показываем кнопку
   [menuImage],
   [menuWebSearch],
-  [menuRealtime],
+  ...(isRealtimeEnabled ? [[menuRealtime]] : []),
 ];
 
 const voiceArr = [[menuSelectVoice], [menuBack]];

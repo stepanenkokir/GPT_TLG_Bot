@@ -13,7 +13,8 @@
     "baseUrl": "${WEBAPP_BASE_URL}",
     "PORT": "${WEBAPP_PORT}",
     "TEST_MODE": "${WEBAPP_TEST_MODE}",
-    "testId": "${WEBAPP_TEST_ID}"
+    "testId": "${WEBAPP_TEST_ID}",
+    "realtimeEnabled": "${REALTIME_ENABLED}"
   },
   "listUsers": "${LIST_USERS_PATH}",
   "adminId": "${ADMIN_ID}"
