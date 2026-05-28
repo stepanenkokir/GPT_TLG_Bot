@@ -7,6 +7,7 @@
  * Map error types to user-friendly messages
  */
 const ERROR_MESSAGES = {
+  QUOTA_EXCEEDED: "Лимит OpenAI исчерпан. Проверьте баланс и настройки billing в аккаунте OpenAI.",
   RATE_LIMIT: "Слишком много запросов. Подождите немного перед следующим сообщением.",
   NETWORK_ERROR: "Проблемы с сетью. Проверьте подключение к интернету и попробуйте позже.",
   API_ERROR: "Ошибка при обращении к API. Попробуйте позже.",
@@ -15,6 +16,19 @@ const ERROR_MESSAGES = {
   TIMEOUT_ERROR: "Превышено время ожидания. Попробуйте еще раз.",
   UNKNOWN_ERROR: "Произошла ошибка. Попробуйте позже или обратитесь к администратору.",
 };
+
+export function isQuotaExceededError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  const code = String(error?.code || error?.error?.code || "").toLowerCase();
+  const type = String(error?.type || error?.error?.type || "").toLowerCase();
+
+  return (
+    code === "insufficient_quota" ||
+    type === "insufficient_quota" ||
+    message.includes("exceeded your current quota") ||
+    message.includes("check your plan and billing")
+  );
+}
 
 /**
  * Determine error type from error object
@@ -26,6 +40,10 @@ function getErrorType(error) {
 
   const status = error?.status || error?.response?.status;
   const message = String(error?.message || "").toLowerCase();
+
+  if (isQuotaExceededError(error)) {
+    return "QUOTA_EXCEEDED";
+  }
 
   // Rate limit errors
   if (status === 429 || message.includes("rate limit")) {

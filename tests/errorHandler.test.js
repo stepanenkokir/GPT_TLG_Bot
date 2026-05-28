@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   getUserErrorMessage,
   handleError,
+  isQuotaExceededError,
   withErrorHandling,
 } from "../utils/errorHandler.js";
 
@@ -24,6 +25,15 @@ describe("getUserErrorMessage", () => {
   it("detects rate limit error by message keyword", () => {
     const err = new Error("rate limit exceeded");
     expect(getUserErrorMessage(err)).toMatch(/запросов/i);
+  });
+
+  it("detects OpenAI quota errors before generic 429 rate limits", () => {
+    const err = Object.assign(
+      new Error("429 You exceeded your current quota, please check your plan and billing details."),
+      { status: 429 }
+    );
+
+    expect(getUserErrorMessage(err)).toMatch(/лимит openai/i);
   });
 
   it("detects network error", () => {
@@ -74,6 +84,13 @@ describe("getUserErrorMessage", () => {
 
   it("returns unknown error for null", () => {
     expect(getUserErrorMessage(null)).toMatch(/ошибка/i);
+  });
+});
+
+describe("isQuotaExceededError", () => {
+  it("detects OpenAI insufficient_quota code", () => {
+    const err = Object.assign(new Error("quota"), { code: "insufficient_quota" });
+    expect(isQuotaExceededError(err)).toBe(true);
   });
 });
 

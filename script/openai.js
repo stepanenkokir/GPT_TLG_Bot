@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { getConfigValue, getConfigValueWithDefault } from "../config/loader.js";
 import { validateMessages } from "../middleware/validators.js";
-import { handleError } from "../utils/errorHandler.js";
+import { handleError, isQuotaExceededError } from "../utils/errorHandler.js";
 import fs, { createReadStream } from "fs";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -136,10 +136,24 @@ const extractTextFromResponse = (resp) => {
 };
 
 const isRetryableError = (error) => {
+  if (isQuotaExceededError(error)) return false;
+
   const status = error?.status;
   if ([408, 409, 429, 500, 502, 503, 504].includes(status)) return true;
   const message = String(error?.message || "");
   return /timeout|ETIMEDOUT|network|fetch failed|socket hang up/i.test(message);
+};
+
+const buildOpenAiErrorResponse = (error, operation) => {
+  const { message: userMessage } = handleError(error, { operation });
+
+  return {
+    text: "",
+    error: error?.message || String(error),
+    userMessage,
+    status: error?.status || error?.response?.status,
+    code: error?.code || error?.error?.code,
+  };
 };
 
 // Универсальный запрос с ретраем и экспоненциальной задержкой
@@ -163,7 +177,8 @@ export const handleOpenAiRequest = async (messages, options = {}) => {
   try {
     const validation = validateMessages(messages);
     if (!validation.valid) {
-      return { text: "", error: `Invalid messages format: ${validation.error}` };
+      const validationError = new Error(`Invalid messages format: ${validation.error}`);
+      return buildOpenAiErrorResponse(validationError, "handleOpenAiRequest.validation");
     }
 
     const model = getModel();
@@ -205,8 +220,7 @@ export const handleOpenAiRequest = async (messages, options = {}) => {
     }
     return { text };
   } catch (e) {
-    handleError(e, { operation: "handleOpenAiRequest" });
-    return { text: "", error: e.message };
+    return buildOpenAiErrorResponse(e, "handleOpenAiRequest");
   }
 };
 
@@ -218,7 +232,8 @@ export const handleOpenAiRequestWithWebSearch = async (
   try {
     const validation = validateMessages(messages);
     if (!validation.valid) {
-      return { text: "", error: `Invalid messages format: ${validation.error}` };
+      const validationError = new Error(`Invalid messages format: ${validation.error}`);
+      return buildOpenAiErrorResponse(validationError, "handleOpenAiRequestWithWebSearch.validation");
     }
 
     const model = getModel();
@@ -264,8 +279,7 @@ export const handleOpenAiRequestWithWebSearch = async (
 
     return { text: extractTextFromResponse(resp) };
   } catch (e) {
-    handleError(e, { operation: "handleOpenAiRequestWithWebSearch" });
-    return { text: "", error: e.message };
+    return buildOpenAiErrorResponse(e, "handleOpenAiRequestWithWebSearch");
   }
 };
 
@@ -288,8 +302,7 @@ export const handleOpenAiRequestVoice = async (messages, id = "default") => {
 
     return { text, buffer };
   } catch (e) {
-    handleError(e, { operation: "handleOpenAiRequestVoice" });
-    return { text: "", error: e.message };
+    return buildOpenAiErrorResponse(e, "handleOpenAiRequestVoice");
   } finally {
     await fs.promises.unlink(speechFile).catch(() => {});
   }
@@ -305,8 +318,7 @@ export const handleOpenAiVoice = async (filepath) => {
     );
     return { text: resp.text };
   } catch (e) {
-    handleError(e, { operation: "handleOpenAiVoice" });
-    return { text: "", error: e.message };
+    return buildOpenAiErrorResponse(e, "handleOpenAiVoice");
   }
 };
 
@@ -331,7 +343,7 @@ export const createOpenAiImage = async (prompt, quality = "medium") => {
     if (!b64) return { buffer: null };
     return { buffer: Buffer.from(b64, "base64") };
   } catch (e) {
-    handleError(e, { operation: "createOpenAiImage" });
-    return { buffer: null, error: e.message };
+    const errorResponse = buildOpenAiErrorResponse(e, "createOpenAiImage");
+    return { buffer: null, ...errorResponse };
   }
 };

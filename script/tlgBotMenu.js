@@ -12,9 +12,9 @@ export const menuWebSearch = "Web Search";
 export const menuVerbosity = "Детализация";
 
 export const VERBOSITY_LEVELS = {
-  brief: { label: "Лаконично", tokens: 800, hint: "Answer very briefly, 2-4 sentences max." },
-  medium: { label: "Средне", tokens: 2000, hint: "Answer with moderate detail." },
-  detailed: { label: "Подробно", tokens: 4000, hint: "Answer in detail with examples and explanations." },
+  brief: { label: "Лаконично", hint: "Answer very briefly, 2-4 sentences max." },
+  medium: { label: "Средне", hint: "Answer with moderate detail." },
+  detailed: { label: "Подробно", hint: "Answer in detail with examples and explanations." },
 };
 
 export const buildVerbosityInlineKeyboard = (current) =>
