@@ -40,21 +40,6 @@ export const httpClient = axios.create({
 });
 
 /**
- * Create a custom axios instance with specific configuration
- * @param {object} config - Axios configuration
- * @returns {AxiosInstance} Configured axios instance
- */
-export function createHttpClient(config = {}) {
-  return axios.create({
-    timeout: 30000,
-    maxRedirects: 5,
-    httpAgent,
-    httpsAgent,
-    ...config,
-  });
-}
-
-/**
  * Cleanup agents (call on application shutdown)
  */
 export function cleanupHttpAgents() {

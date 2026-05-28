@@ -14,11 +14,3 @@ export function getTelegramBot() {
   }
   return botInstance;
 }
-
-/**
- * Reset bot instance (useful for testing)
- */
-export function resetBotInstance() {
-  botInstance = null;
-}
-
