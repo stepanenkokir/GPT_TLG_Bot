@@ -6,7 +6,7 @@ Telegram бот с AI помощником на базе OpenAI GPT-4, подд�
 
 - 💬 Текстовый диалог с GPT-4
 - 🎤 Голосовые сообщения (Whisper → GPT → TTS)
-- 🎨 Генерация изображений (DALL-E 3)
+- 🎨 Генерация изображений (`gpt-image-1-mini`)
 - 🔴 Realtime голосовое общение через WebRTC
 - 📷 Анализ фотографий
 - 🔍 Web Search для актуальной информации
@@ -52,12 +52,11 @@ npm run dev
 - `OPENAI_API_KEY` - API ключ OpenAI
 
 **Опциональные переменные:**
-- `OPENAI_MODEL` - Модель GPT (по умолчанию: gpt-4.1-mini-2025-04-14)
-- `OPENAI_REALTIME_MODEL` - Модель для realtime (по умолчанию: gpt-4o-realtime-preview-2024-12-17)
+- `OPENAI_MODEL` - Модель GPT (по умолчанию: gpt-4o-mini)
+- `OPENAI_REALTIME_MODEL` - Модель для realtime (по умолчанию: gpt-4o-realtime-preview-2025-06-03)
 - `WEBAPP_PORT` - Порт для веб-приложения (по умолчанию: 3000)
 - `WEBAPP_BASE_URL` - Базовый URL веб-приложения
 - `WEBAPP_TEST_MODE` - Режим тестирования (true/false)
-- `ADMIN_ID` - ID администратора
 
 Полный список переменных см. в `.env.example`.
 
@@ -67,6 +66,11 @@ npm run dev
 ```json
 [1120239873, 123456789]
 ```
+
+Файлы с runtime-данными (они игнорируются через `.gitignore`):
+- `authorizedUsers.txt` — allowlist пользователей Telegram
+- `listToSendJoke.txt` — список chat/user id для рассылки анекдотов
+- `listToSendNews.txt` — список chat/user id для рассылки новостей
 
 ## Структура проекта
 
@@ -101,6 +105,8 @@ GPT_TLG_Bot/
 ```
 
 ## API Endpoints
+
+Ниже перечисленные HTTP endpoints доступны только если `REALTIME_ENABLED=true`.
 
 ### Health Check
 ```
