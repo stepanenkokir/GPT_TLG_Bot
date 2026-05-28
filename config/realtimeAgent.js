@@ -28,12 +28,25 @@ export const REALTIME_ROLES = Object.freeze({
 
 export const REALTIME_ROLE_KEYS = Object.keys(REALTIME_ROLES);
 
+const DEFAULT_REALTIME_MODEL = "gpt-realtime-2";
+const LEGACY_REALTIME_MODEL_PREFIXES = ["gpt-4o-realtime-preview"];
+
 export function getRealtimeModel() {
-  return getConfigValueWithDefault(
+  const model = getConfigValueWithDefault(
     "openai.realtimeModel",
     "OPENAI_REALTIME_MODEL",
-    "gpt-realtime-2"
+    DEFAULT_REALTIME_MODEL
   );
+
+  if (
+    typeof model !== "string" ||
+    /^\$\{.+\}$/.test(model) ||
+    LEGACY_REALTIME_MODEL_PREFIXES.some((prefix) => model.startsWith(prefix))
+  ) {
+    return DEFAULT_REALTIME_MODEL;
+  }
+
+  return model;
 }
 
 export function getRealtimeRoleConfig(role = DEFAULT_REALTIME_ROLE) {
