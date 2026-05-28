@@ -6,6 +6,13 @@ import { apiRateLimiter } from "./middleware/rateLimiter.js";
 
 export function createHttpServer() {
   const app = express();
+  const trustProxy = getConfigValueWithDefault(
+    "webapp.trustProxy",
+    "WEBAPP_TRUST_PROXY",
+    true
+  );
+
+  app.set("trust proxy", trustProxy);
   const allowedOrigin = getConfigValueWithDefault(
     "webapp.baseUrl",
     "WEBAPP_BASE_URL",

@@ -132,6 +132,7 @@ export function registerApiRoutes(app) {
         headers: {
           Authorization: `Bearer ${API_KEY}`,
           "Content-Type": "application/json",
+          "OpenAI-Beta": "realtime=v1",
         },
         body: JSON.stringify({
           model: MODEL,
@@ -146,15 +147,28 @@ export function registerApiRoutes(app) {
       });
 
       if (!resp.ok) {
-        console.log(`OpenAI API error: ${resp.status} ${resp.statusText}`);
-        throw new Error(`OpenAI API error: ${resp.status} ${resp.statusText}`);
+        const responseText = await resp.text();
+        console.log(
+          `OpenAI API error: ${resp.status} ${resp.statusText} - ${responseText}`
+        );
+        const error = new Error(
+          `OpenAI API error: ${resp.status} ${resp.statusText}`
+        );
+        error.status = resp.status;
+        error.openAiResponse = responseText;
+        throw error;
       }
 
       const json = await resp.json();
       res.json(json);
     } catch (error) {
       const { message } = handleError(error, { operation: "routes.api.setRole" });
-      res.status(500).json({ error: message });
+      const details = error?.openAiResponse;
+      const status = error?.status || 500;
+      res.status(status >= 400 && status < 600 ? status : 500).json({
+        error: message,
+        ...(details ? { details } : {}),
+      });
     }
   });
 
