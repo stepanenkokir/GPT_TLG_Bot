@@ -4,7 +4,7 @@ import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import ffmpeg from "fluent-ffmpeg";
 import installer from "@ffmpeg-installer/ffmpeg";
-import { unlink } from "fs/promises";
+import { mkdir, unlink } from "fs/promises";
 
 export async function removeFile(path) {
   if (!path) return;
@@ -19,15 +19,23 @@ export async function removeFile(path) {
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const voicesDir = resolve(__dirname, "../voices");
+
+const buildTempAudioName = (baseName, ext) =>
+  `${baseName}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
 class OggConverter {
   constructor() {
     ffmpeg.setFfmpegPath(installer.path);
   }
 
+  async removeFile(path) {
+    await removeFile(path);
+  }
+
   toMP3(input, output) {
     try {
-      const outputPath = resolve(dirname(input), `${output}.mp3`);
+      const outputPath = resolve(dirname(input), buildTempAudioName(output, "mp3"));
 
       return new Promise((resolve, reject) => {
         ffmpeg(input)
@@ -57,7 +65,8 @@ class OggConverter {
 
   async create(url, filename) {
     try {
-      const oggPath = resolve(__dirname, "../voices", `${filename}.ogg`);
+      await mkdir(voicesDir, { recursive: true });
+      const oggPath = resolve(voicesDir, buildTempAudioName(filename, "ogg"));
       const response = await httpClient({
         method: "get",
         url,
