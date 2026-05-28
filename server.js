@@ -5,13 +5,15 @@ import { registerApiRoutes } from "./routes/api.js";
 import { apiRateLimiter } from "./middleware/rateLimiter.js";
 
 const resolveTrustProxy = (value) => {
-  if (typeof value === "boolean" || typeof value === "number") return value;
-  if (typeof value !== "string") return true;
+  if (typeof value === "boolean") return value ? 1 : false;
+  if (typeof value === "number") return value;
+  if (typeof value !== "string") return 1;
 
   const trimmed = value.trim();
-  if (!trimmed || /^\$\{.+\}$/.test(trimmed)) return true;
-  if (trimmed.toLowerCase() === "true") return true;
+  if (!trimmed || /^\$\{.+\}$/.test(trimmed)) return 1;
+  if (trimmed.toLowerCase() === "true") return 1;
   if (trimmed.toLowerCase() === "false") return false;
+  if (!Number.isNaN(Number(trimmed))) return Number(trimmed);
   return trimmed;
 };
 
@@ -20,7 +22,7 @@ export function createHttpServer() {
   const trustProxyRaw = getConfigValueWithDefault(
     "webapp.trustProxy",
     "WEBAPP_TRUST_PROXY",
-    true
+    1
   );
   const trustProxy = resolveTrustProxy(trustProxyRaw);
 

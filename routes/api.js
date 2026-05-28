@@ -3,9 +3,12 @@ import { httpClient } from "../utils/httpClient.js";
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
 import { getConfigValue, getConfigValueWithDefault } from "../config/loader.js";
-import { createHmac } from "crypto";
+import { createHash, createHmac } from "crypto";
 import { verifyWebToken } from "../utils/webToken.js";
-import { VOICE_ROLES } from "../config/voiceRoles.js";
+import {
+  createRealtimeSessionConfig,
+  getRealtimeRoleConfig,
+} from "../config/realtimeAgent.js";
 import { isUserAuthorized } from "../middleware/checkAuthUser.js";
 import { getTelegramBot } from "../script/telegramBotInstance.js";
 import { sendMessageInChunks } from "../script/telegramUtils.js";
@@ -16,13 +19,11 @@ import { strictRateLimiter } from "../middleware/rateLimiter.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const MODEL = getConfigValueWithDefault(
-  "openai.realtimeModel",
-  "OPENAI_REALTIME_MODEL",
-  "gpt-4o-realtime-preview-2025-06-03"
-);
-
 const API_KEY = getConfigValue("openai.apiKey", "OPENAI_API_KEY");
+
+function getSafetyIdentifier(userId) {
+  return createHash("sha256").update(String(userId)).digest("hex");
+}
 
 function verifyInitData(raw, botToken) {
   if (!raw || typeof raw !== "string") return { ok: false };
@@ -99,10 +100,15 @@ export function registerApiRoutes(app) {
       const webToken = req.header("x-webapp-token") || "";
 
       let verification = null;
+      let userIdToCheck = getConfigValueWithDefault(
+        "webapp.testId",
+        "WEBAPP_TEST_ID",
+        "test-user"
+      );
       if (!testMode) {
         verification = verifyInitData(initData, botToken);
         const tokenData = verifyWebToken(webToken, botToken);
-        const userIdToCheck = verification.userId || tokenData?.uid;
+        userIdToCheck = verification.userId || tokenData?.uid;
         if (
           !verification.ok ||
           !userIdToCheck ||
@@ -112,10 +118,10 @@ export function registerApiRoutes(app) {
         }
       }
 
-      const { role, voice } = req.body;
+      const { role } = req.body;
 
       // Validate role data
-      const validation = validateRole({ role, voice });
+      const validation = validateRole({ role });
       if (!validation.valid) {
         return res.status(400).json({ error: validation.error });
       }
@@ -125,22 +131,21 @@ export function registerApiRoutes(app) {
         ? "Kirill"
         : verification?.userName || "Unknown";
 
-      const voiceInstruction = VOICE_ROLES[role] ?? VOICE_ROLES.default;
-
-      const resp = await fetch("https://api.openai.com/v1/realtime/sessions", {
+      const resp = await fetch("https://api.openai.com/v1/realtime/client_secrets", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${API_KEY}`,
           "Content-Type": "application/json",
+          "OpenAI-Safety-Identifier": getSafetyIdentifier(userIdToCheck),
         },
         body: JSON.stringify({
-          model: MODEL,
-          voice: voice,
-          instructions: `User: ${telegramUserName}. ${voiceInstruction}`,
-          input_audio_format: "pcm16",
-          output_audio_format: "pcm16",
-          input_audio_transcription: {
-            model: "whisper-1",
+          session: createRealtimeSessionConfig({
+            role,
+            userName: telegramUserName,
+          }),
+          expires_after: {
+            anchor: "created_at",
+            seconds: 600,
           },
         }),
       });
@@ -159,7 +164,14 @@ export function registerApiRoutes(app) {
       }
 
       const json = await resp.json();
-      res.json(json);
+      const roleConfig = getRealtimeRoleConfig(role);
+      res.json({
+        ...json,
+        role: {
+          name: roleConfig.name,
+          voice: roleConfig.voice,
+        },
+      });
     } catch (error) {
       const { message } = handleError(error, { operation: "routes.api.setRole" });
       const details = error?.openAiResponse;
@@ -238,18 +250,33 @@ export function registerApiRoutes(app) {
           return res.status(400).json({ error: "Empty SDP" });
         }
 
-        const url = `https://api.openai.com/v1/realtime?model=${encodeURIComponent(
-          MODEL
-        )}`;
-        const oaResp = await httpClient.post(url, offerSdp, {
-          headers: {
-            Authorization: `Bearer ${API_KEY}`,
-            "Content-Type": "application/sdp",
-          },
-          timeout: 15000,
-          responseType: "text",
-          validateStatus: () => true,
-        });
+        const formData = new FormData();
+        formData.set("sdp", offerSdp);
+        formData.set(
+          "session",
+          JSON.stringify(
+            createRealtimeSessionConfig({
+              role: getConfigValueWithDefault(
+                "openai.realtimeRole",
+                "OPENAI_REALTIME_ROLE",
+                "default"
+              ),
+            })
+          )
+        );
+
+        const oaResp = await httpClient.post(
+          "https://api.openai.com/v1/realtime/calls",
+          formData,
+          {
+            headers: {
+              Authorization: `Bearer ${API_KEY}`,
+            },
+            timeout: 15000,
+            responseType: "text",
+            validateStatus: () => true,
+          }
+        );
 
         if (oaResp.status < 200 || oaResp.status >= 300) {
           return res.status(oaResp.status).send(String(oaResp.data || ""));

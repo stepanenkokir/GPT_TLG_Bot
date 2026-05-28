@@ -1,4 +1,5 @@
 import Joi from "joi";
+import { REALTIME_ROLE_KEYS } from "../config/realtimeAgent.js";
 
 /**
  * Validation schemas for different data types
@@ -63,13 +64,8 @@ export function validateMessages(messages) {
  * Role validation schema for API endpoints
  */
 export const roleSchema = Joi.object({
-  role: Joi.string()
-    .valid("default", "doctor", "teacher", "hooligan")
-    .required(),
-  voice: Joi.string()
-    .valid("echo", "ash", "sage", "alloy", "ballad", "nova", "shimmer")
-    .required(),
-});
+  role: Joi.string().valid(...REALTIME_ROLE_KEYS).required(),
+}).unknown(false);
 
 /**
  * Validate role data

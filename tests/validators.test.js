@@ -68,24 +68,24 @@ describe("validateMessages", () => {
 });
 
 describe("validateRole", () => {
-  it("accepts valid role and voice combinations", () => {
-    const validCombos = [
-      { role: "default", voice: "echo" },
-      { role: "doctor", voice: "ash" },
-      { role: "teacher", voice: "sage" },
-      { role: "hooligan", voice: "nova" },
+  it("accepts valid realtime roles", () => {
+    const validRoles = [
+      { role: "default" },
+      { role: "doctor" },
+      { role: "teacher" },
+      { role: "hooligan" },
     ];
-    for (const data of validCombos) {
+    for (const data of validRoles) {
       expect(validateRole(data).valid).toBe(true);
     }
   });
 
   it("rejects unknown role", () => {
-    const result = validateRole({ role: "alien", voice: "echo" });
+    const result = validateRole({ role: "alien" });
     expect(result.valid).toBe(false);
   });
 
-  it("rejects unknown voice", () => {
+  it("rejects client-provided voice", () => {
     const result = validateRole({ role: "default", voice: "robotvoice" });
     expect(result.valid).toBe(false);
   });
@@ -95,9 +95,9 @@ describe("validateRole", () => {
     expect(result.valid).toBe(false);
   });
 
-  it("rejects missing voice", () => {
+  it("accepts missing voice because server resolves it by role", () => {
     const result = validateRole({ role: "default" });
-    expect(result.valid).toBe(false);
+    expect(result.valid).toBe(true);
   });
 });
 

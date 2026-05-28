@@ -10,14 +10,6 @@ let isActive = false;
 let isStopping = false;
 let selectedRole = "default";
 
-// Role configurations
-const roleConfigs = {
-  default: { voice: "echo", name: "Просто Дилан" },
-  doctor: { voice: "ash", name: "Доктор наук" },
-  teacher: { voice: "sage", name: "Учительница начальной школы" },
-  hooligan: { voice: "alloy", name: "Умный хулиган" },
-};
-
 // iOS detection
 // ensure defined only once
 if (typeof window !== "undefined" && !window.__APP_IS_IOS_DEFINED__) {
@@ -81,7 +73,7 @@ function setButtonState(state) {
   if (state) micButton.classList.add(state);
 }
 
-// All OpenAI communication is proxied by the server; no keys on client
+// The server creates a short-lived realtime client secret for this WebApp.
 
 // (Removed) iOS AudioContext unlock and permission pre-check; rely on user gesture and getUserMedia
 
@@ -100,18 +92,17 @@ async function startRealtime() {
 
   // Keep setup minimal; rely on getUserMedia to request mic access
 
-  // Send role selection to server
+  // The backend owns the final voice-agent config for this role.
   const sessionToken = await sendRoleToServer();
   if (
     !sessionToken ||
-    !sessionToken.client_secret ||
-    !sessionToken.client_secret.value
+    (!sessionToken.value && !sessionToken.client_secret?.value)
   ) {
     throw new Error(
       "Не удалось инициализировать сессию (token). Попробуйте еще раз."
     );
   }
-  const EPHEMERAL_KEY = sessionToken.client_secret.value;
+  const EPHEMERAL_KEY = sessionToken.value || sessionToken.client_secret.value;
 
   setStatus("Инициализация WebRTC...");
 
@@ -227,14 +218,12 @@ async function startRealtime() {
   await pc.setLocalDescription(offer);
 
   setStatus("Создание SDP...");
-  const sdpResponse = await fetch(`/realtime/sdp`, {
+  const sdpResponse = await fetch("https://api.openai.com/v1/realtime/calls", {
     method: "POST",
     body: offer.sdp,
     headers: {
       Authorization: `Bearer ${EPHEMERAL_KEY}`,
       "Content-Type": "application/sdp",
-      "x-telegram-init-data": getInitData(),
-      "x-webapp-token": getUrlToken() || "",
     },
   });
 
@@ -331,8 +320,6 @@ async function sendRoleToServer() {
       },
       body: JSON.stringify({
         role: selectedRole,
-        voice: roleConfigs[selectedRole].voice,
-        name: roleConfigs[selectedRole].name,
       }),
     });
 
