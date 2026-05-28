@@ -7,6 +7,7 @@ let micStream = null;
 let remoteAudioEl = null;
 let dataChannel = null;
 let isActive = false;
+let isStarting = false;
 let isStopping = false;
 let selectedRole = "default";
 
@@ -230,7 +231,7 @@ async function startRealtime() {
   if (!sdpResponse.ok) {
     const text = await sdpResponse.text();
     throw new Error(
-      `Realtime SDP exchange failed: ${sdpResponse.status} ${text}`
+      `Ошибка соединения с Realtime: ${sdpResponse.status} ${text}`
     );
   }
 
@@ -240,7 +241,7 @@ async function startRealtime() {
   setStatus("Готово. Вы в эфире.");
 }
 
-async function stopRealtime() {
+async function stopRealtime({ finalStatus = "Отключено" } = {}) {
   if (isStopping) return;
   isStopping = true;
   console.log("stopRealtime");
@@ -304,7 +305,9 @@ async function stopRealtime() {
     micStream = null;
     dataChannel = null;
     remoteAudioEl = null;
-    setStatus("Отключено");
+    if (finalStatus) {
+      setStatus(finalStatus);
+    }
     isStopping = false;
   }
 }
@@ -324,13 +327,23 @@ async function sendRoleToServer() {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to set role: ${response.status}`);
+      const text = await response.text();
+      let details = text;
+      try {
+        const json = JSON.parse(text);
+        details = json.error || json.details || text;
+      } catch (_) {}
+      throw new Error(
+        `Не удалось создать Realtime-сессию: ${response.status}${
+          details ? ` ${details}` : ""
+        }`
+      );
     }
 
     return response.json();
   } catch (error) {
     console.error("Error sending role to server:", error);
-    // Don't throw error, continue with session start
+    throw new Error(error?.message || "Не удалось связаться с сервером");
   }
 }
 
@@ -340,6 +353,8 @@ async function sendRoleToServer() {
 roleSelect.addEventListener("change", updateRoleSelection);
 
 micButton.addEventListener("click", async () => {
+  if (isStarting) return;
+
   if (isActive) {
     await stopRealtime();
     return;
@@ -347,12 +362,16 @@ micButton.addEventListener("click", async () => {
 
   try {
     setActiveUI(true);
-    isActive = true;
+    isStarting = true;
     await startRealtime();
+    isActive = true;
   } catch (e) {
-    console.error(e);
-    setStatus(`Ошибка: ${e.message}`);
-    await stopRealtime();
+    const message = e?.message || "Неизвестная ошибка";
+    console.error("Realtime start failed:", e);
+    await stopRealtime({ finalStatus: null });
+    setStatus(`Ошибка: ${message}`);
+  } finally {
+    isStarting = false;
   }
 });
 
@@ -383,7 +402,7 @@ const sendMessageToTelegram = async (message) => {
 
 // Page lifecycle hooks (important for iOS)
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
+  if (document.hidden && !isStarting) {
     cleanupOnHideOrClose();
   }
 });
