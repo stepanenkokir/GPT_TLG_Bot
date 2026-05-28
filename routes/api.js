@@ -10,6 +10,8 @@ import { isUserAuthorized } from "../middleware/checkAuthUser.js";
 import { getTelegramBot } from "../script/telegramBotInstance.js";
 import { sendMessageInChunks } from "../script/telegramUtils.js";
 import { validateRole, validateTextMessage } from "../middleware/validators.js";
+import { handleError } from "../utils/errorHandler.js";
+import { strictRateLimiter } from "../middleware/rateLimiter.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -76,11 +78,11 @@ export function registerApiRoutes(app) {
   });
 
   // Gate index page: allow only inside Telegram WebApp and authorized users
-  app.get(["/", "/index.html"], (req, res) => {
+  app.get(["/", "/index.html"], async (req, res) => {
     const t = req.query?.t;
     if (!testMode) {
       const tokenData = verifyWebToken(t, botToken);
-      if (!tokenData || !tokenData.uid || !isUserAuthorized(tokenData.uid)) {
+      if (!tokenData || !tokenData.uid || !(await isUserAuthorized(tokenData.uid))) {
         return res.status(401).send("Open this page from Telegram bot");
       }
     }
@@ -91,7 +93,7 @@ export function registerApiRoutes(app) {
   app.use(express.static(path.join(__dirname, "../public")));
 
   // Set role endpoint
-  app.post("/api/set-role", express.json(), async (req, res) => {
+  app.post("/api/set-role", strictRateLimiter, express.json(), async (req, res) => {
     try {
       const initData = req.header("x-telegram-init-data") || "";
       const webToken = req.header("x-webapp-token") || "";
@@ -104,7 +106,7 @@ export function registerApiRoutes(app) {
         if (
           !verification.ok ||
           !userIdToCheck ||
-          !isUserAuthorized(userIdToCheck)
+          !(await isUserAuthorized(userIdToCheck))
         ) {
           return res.status(401).json({ error: "Unauthorized" });
         }
@@ -151,8 +153,8 @@ export function registerApiRoutes(app) {
       const json = await resp.json();
       res.json(json);
     } catch (error) {
-      console.error("Error setting role:", error);
-      res.status(500).json({ error: "Failed to set role" });
+      const { message } = handleError(error, { operation: "routes.api.setRole" });
+      res.status(500).json({ error: message });
     }
   });
 
@@ -177,7 +179,7 @@ export function registerApiRoutes(app) {
       if (
         !verification.ok ||
         !userIdToCheck ||
-        !isUserAuthorized(userIdToCheck)
+        !(await isUserAuthorized(userIdToCheck))
       ) {
         return res.status(401).json({ error: "Unauthorized" });
       }
@@ -188,8 +190,8 @@ export function registerApiRoutes(app) {
       });
       res.json({ ok: true });
     } catch (error) {
-      console.error("Error in realtime-message:", error);
-      res.status(500).json({ error: "Failed to send message" });
+      const { message } = handleError(error, { operation: "routes.api.realtimeMessage" });
+      res.status(500).json({ error: message });
     }
   });
 
@@ -212,7 +214,7 @@ export function registerApiRoutes(app) {
           if (
             !verification.ok ||
             !userIdToCheck ||
-            !isUserAuthorized(userIdToCheck)
+            !(await isUserAuthorized(userIdToCheck))
           ) {
             return res.status(401).json({ error: "Unauthorized" });
           }
@@ -245,7 +247,8 @@ export function registerApiRoutes(app) {
         return res.status(200).send(String(oaResp.data || ""));
       } catch (err) {
         const status = err?.response?.status || 500;
-        const message = err?.response?.data || "Failed SDP exchange";
+        const { message: userMessage } = handleError(err, { operation: "routes.api.realtimeSdp" });
+        const message = err?.response?.data || userMessage;
         return res
           .status(status)
           .send(

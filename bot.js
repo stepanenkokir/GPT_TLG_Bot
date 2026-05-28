@@ -4,6 +4,7 @@ import { setupBotCommands } from "./script/telegramBot.js";
 import { checkAuthUserImproved } from "./middleware/checkAuthUser.js";
 import { botRateLimitMiddleware } from "./middleware/rateLimiter.js";
 import { getTelegramBot } from "./script/telegramBotInstance.js";
+import { getSessionStore } from "./middleware/sessionStore.js";
 import { createLogger, format, transports } from "winston";
 import fs from "fs/promises";
 
@@ -14,6 +15,18 @@ const ensureLogDir = async () => {
     await fs.mkdir("log", { recursive: true });
   } catch (_) {}
 };
+
+const createTelegrafStoreAdapter = (store) => ({
+  async get(key) {
+    return store.get(key);
+  },
+  async set(key, value) {
+    await store.set(key, value);
+  },
+  async delete(key) {
+    await store.delete(key);
+  },
+});
 
 export async function launchTelegramBot() {
   // Initialize OpenAI once for bot features
@@ -52,12 +65,9 @@ export async function launchTelegramBot() {
     await next();
   };
 
-  // Session middleware
-  // Note: To use custom session store (e.g., Redis), you can create an adapter:
-  // import { getSessionStore } from "./middleware/sessionStore.js";
-  // const store = getSessionStore();
-  // bot.use(session({ store: createTelegrafStoreAdapter(store) }));
-  bot.use(session());
+  // Session middleware via project session store abstraction.
+  const store = getSessionStore();
+  bot.use(session({ store: createTelegrafStoreAdapter(store) }));
   bot.use(botRateLimitMiddleware);
   bot.use(checkAuthUserImproved, saveLog);
 

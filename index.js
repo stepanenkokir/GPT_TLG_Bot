@@ -6,26 +6,30 @@ import { createHttpServer } from "./server.js";
 import { launchTelegramBot } from "./bot.js";
 import { getConfigValueWithDefault } from "./config/loader.js";
 
-const realtimeEnabled = getConfigValueWithDefault(
-  "webapp.realtimeEnabled",
-  "REALTIME_ENABLED",
-  false
-);
+async function main() {
+  const realtimeEnabled = getConfigValueWithDefault(
+    "webapp.realtimeEnabled",
+    "REALTIME_ENABLED",
+    false
+  );
 
-if (realtimeEnabled) {
-  createHttpServer();
-} else {
-  console.log("Realtime is disabled (REALTIME_ENABLED=false). WebApp server not started.");
+  if (realtimeEnabled) {
+    createHttpServer();
+  } else {
+    console.log("Realtime is disabled (REALTIME_ENABLED=false). WebApp server not started.");
+  }
+
+  await launchTelegramBot();
+
+  const jokeSender = new JokeSender("listToSendJoke.txt");
+  jokeSender.startDailyJob();
+
+  const newsSender = new NewsSender("listToSendNews.txt");
+  newsSender.startDailyJob();
+  newsSender.startWeeklyJob();
 }
 
-// Launch Telegram bot
-launchTelegramBot();
-
-// Background jobs
-const jokeSender = new JokeSender("listToSendJoke.txt");
-jokeSender.startDailyJob();
-
-// News background jobs
-const newsSender = new NewsSender("listToSendNews.txt");
-newsSender.startDailyJob();
-newsSender.startWeeklyJob();
+main().catch((error) => {
+  console.error("Application startup failed:", error);
+  process.exit(1);
+});

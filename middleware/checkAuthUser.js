@@ -4,6 +4,7 @@ import { resolve } from "path";
 let authorizedUsers = [];
 let lastLoadedAt = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000; // перезагружать не чаще раза в 5 минут
+let loadingPromise = null;
 
 const AUTH_FILE_PATH = resolve(process.cwd(), "authorizedUsers.txt");
 
@@ -20,6 +21,11 @@ const ensureAuthorizedUsersFileExists = async () => {
 };
 
 const loadAuthorizedUsers = async () => {
+  if (loadingPromise) {
+    return loadingPromise;
+  }
+
+  loadingPromise = (async () => {
   try {
     await ensureAuthorizedUsersFileExists();
     const data = await fs.readFile(AUTH_FILE_PATH, "utf-8");
@@ -36,7 +42,13 @@ const loadAuthorizedUsers = async () => {
     lastLoadedAt = Date.now();
   } catch (err) {
     console.error("Error loading authorized users:", err);
+    throw err;
+  } finally {
+    loadingPromise = null;
   }
+  })();
+
+  return loadingPromise;
 };
 
 const loadIfStale = async () => {
@@ -46,7 +58,7 @@ const loadIfStale = async () => {
 };
 
 // Load initially
-loadAuthorizedUsers();
+loadAuthorizedUsers().catch(() => {});
 
 export const checkAuthUserImproved = async (ctx, next) => {
   try {
@@ -61,11 +73,15 @@ export const checkAuthUserImproved = async (ctx, next) => {
     }
   } catch (err) {
     console.error("Error checking user authorization:", err);
+    await ctx.reply(
+      "Временная ошибка проверки авторизации. Попробуйте позже."
+    );
   }
 };
 
-export const isUserAuthorized = (userId) => {
+export const isUserAuthorized = async (userId) => {
   try {
+    await loadIfStale();
     return authorizedUsers.includes(userId);
   } catch {
     return false;
