@@ -132,7 +132,6 @@ export function registerApiRoutes(app) {
         headers: {
           Authorization: `Bearer ${API_KEY}`,
           "Content-Type": "application/json",
-          "OpenAI-Beta": "realtime=v1",
         },
         body: JSON.stringify({
           model: MODEL,
@@ -246,7 +245,6 @@ export function registerApiRoutes(app) {
           headers: {
             Authorization: `Bearer ${API_KEY}`,
             "Content-Type": "application/sdp",
-            "OpenAI-Beta": "realtime=v1",
           },
           timeout: 15000,
           responseType: "text",
