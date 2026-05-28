@@ -4,8 +4,12 @@ import { getConfigValue, getConfigValueWithDefault } from "../config/loader.js";
 import { signWebToken } from "../utils/webToken.js";
 import { replyInChunks } from "./telegramUtils.js";
 import { handleError } from "../utils/errorHandler.js";
-import { DEFAULT_VERBOSITY, checkSession, createNewSession } from "./telegram/session.js";
-import { textHandler, handleOpenAiVoice, handlePhotoMessage } from "./telegram/textHandler.js";
+import { checkSession, createNewSession } from "./telegram/session.js";
+import {
+  textHandler,
+  handleOpenAiVoice,
+  handlePhotoMessage,
+} from "./telegram/textHandler.js";
 
 const setRole = async (ctx) => {
   await checkSession(ctx);
@@ -36,7 +40,7 @@ const selectText = async (ctx) => {
 const welcomeMsg = async (ctx) => {
   await ctx.reply(
     "Привет! Я Дилан. Задай мне свой вопрос, и я попробую на него ответить.",
-    menu.mainMenu
+    menu.mainMenu,
   );
 };
 
@@ -67,34 +71,40 @@ export function setupBotCommands(bot) {
       ctx,
       `Режим Web Search: ${enabled ? "включён" : "выключен"}.` +
         "\nНажми кнопку ниже, чтобы переключить.",
-      menu.buildWebSearchInlineKeyboard(enabled)
-    );
-  });
-
-  bot.hears(menu.menuVerbosity, async (ctx) => {
-    await checkSession(ctx);
-    const current = ctx.session.parametres.verbosity ?? DEFAULT_VERBOSITY;
-    const currentLabel = menu.VERBOSITY_LEVELS[current]?.label ?? current;
-    await ctx.reply(
-      `Текущая детализация ответов: <b>${currentLabel}</b>\nВыбери уровень:`,
-      { parse_mode: "HTML", ...menu.buildVerbosityInlineKeyboard(current) }
+      menu.buildWebSearchInlineKeyboard(enabled),
     );
   });
 
   if (menu.isRealtimeEnabled) {
     bot.hears(menu.menuRealtime, async (ctx) => {
       await checkSession(ctx);
-      const baseUrl = getConfigValueWithDefault(
+      const baseUrlRaw = getConfigValueWithDefault(
         "webapp.baseUrl",
         "WEBAPP_BASE_URL",
-        "http://localhost:3000"
+        "http://localhost:3000",
       );
+      let baseUrl;
+      try {
+        baseUrl = new URL(baseUrlRaw);
+      } catch {
+        await ctx.reply(
+          "Realtime недоступен: WEBAPP_BASE_URL задан некорректно. Обратитесь к администратору и Укажите полный HTTPS URL, например https://yourdomain.com.",
+        );
+        return;
+      }
+      if (baseUrl.protocol !== "https:") {
+        await ctx.reply(
+          "Realtime недоступен: Telegram принимает Web App только по HTTPS. Обратитесь к администратору и Обновите WEBAPP_BASE_URL на публичный HTTPS адрес.",
+        );
+        return;
+      }
       const secret = getConfigValue("telegramBot.token", "TELEGRAM_BOT_TOKEN");
       const token = signWebToken({ uid: ctx.from.id }, secret, 60);
-      const url = `${baseUrl}/?t=${encodeURIComponent(token)}`;
+      const url = new URL("/", baseUrl);
+      url.searchParams.set("t", token);
       await ctx.reply(
         "Открыть мини‑приложение Realtime",
-        menu.buildRealtimeInlineKeyboard(url)
+        menu.buildRealtimeInlineKeyboard(url.toString()),
       );
     });
   }
@@ -105,21 +115,6 @@ export function setupBotCommands(bot) {
     await textHandler(ctx, userMessage);
   });
 
-  // Обработка инлайн-кнопок выбора детализации
-  for (const key of Object.keys(menu.VERBOSITY_LEVELS)) {
-    bot.action(`set_verbosity_${key}`, async (ctx) => {
-      await checkSession(ctx);
-      ctx.session.parametres.verbosity = key;
-      const label = menu.VERBOSITY_LEVELS[key].label;
-      try {
-        await ctx.editMessageReplyMarkup(
-          menu.buildVerbosityInlineKeyboard(key).reply_markup
-        );
-      } catch (_) {}
-      await ctx.answerCbQuery(`Детализация: ${label}`, { show_alert: false });
-    });
-  }
-
   // Обработка инлайн-кнопки переключения Web Search
   bot.action("toggle_websearch", async (ctx) => {
     await checkSession(ctx);
@@ -128,12 +123,12 @@ export function setupBotCommands(bot) {
     const now = ctx.session.parametres.useWebSearch;
     try {
       await ctx.editMessageReplyMarkup(
-        menu.buildWebSearchInlineKeyboard(now).reply_markup
+        menu.buildWebSearchInlineKeyboard(now).reply_markup,
       );
     } catch (_) {}
     await ctx.answerCbQuery(
       now ? "Web Search включён" : "Web Search выключен",
-      { show_alert: false }
+      { show_alert: false },
     );
   });
 
@@ -142,7 +137,9 @@ export function setupBotCommands(bot) {
     try {
       if (ctx.message.voice) {
         await ctx.telegram.sendChatAction(ctx.chat.id, "upload_voice");
-        const oggLink = await ctx.telegram.getFileLink(ctx.message.voice.file_id);
+        const oggLink = await ctx.telegram.getFileLink(
+          ctx.message.voice.file_id,
+        );
         const oggPath = await ogg.create(oggLink.href, userId);
         const mp3Path = await ogg.toMP3(oggPath, userId);
         try {

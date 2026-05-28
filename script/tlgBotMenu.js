@@ -9,23 +9,6 @@ export const menuSelectVoice = "Отвечать голосом";
 export const menuSelectText = "Отвечать текстом";
 export const menuRealtime = "Realtime";
 export const menuWebSearch = "Web Search";
-export const menuVerbosity = "Детализация";
-
-export const VERBOSITY_LEVELS = {
-  brief: { label: "Лаконично", hint: "Answer very briefly, 2-4 sentences max." },
-  medium: { label: "Средне", hint: "Answer with moderate detail." },
-  detailed: { label: "Подробно", hint: "Answer in detail with examples and explanations." },
-};
-
-export const buildVerbosityInlineKeyboard = (current) =>
-  Markup.inlineKeyboard(
-    Object.entries(VERBOSITY_LEVELS).map(([key, { label }]) => [
-      Markup.button.callback(
-        key === current ? `✅ ${label}` : label,
-        `set_verbosity_${key}`
-      ),
-    ])
-  );
 
 export const isRealtimeEnabled = getConfigValueWithDefault(
   "webapp.realtimeEnabled",
@@ -39,7 +22,6 @@ const menuArr = [
   // голосовое меню скрыто, не показываем кнопку
   [menuImage],
   [menuWebSearch],
-  [menuVerbosity],
   ...(isRealtimeEnabled ? [[menuRealtime]] : []),
 ];
 

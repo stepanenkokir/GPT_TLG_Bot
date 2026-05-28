@@ -1,7 +1,5 @@
 import { handleError } from "../../utils/errorHandler.js";
 
-export const DEFAULT_VERBOSITY = "medium";
-
 export const roles = {
   ASSISTANT: "assistant",
   USER: "user",
@@ -23,7 +21,6 @@ export const defaultParameters = () => ({
   drawImage: false,
   voiceLang: "Russian",
   useWebSearch: false,
-  verbosity: DEFAULT_VERBOSITY,
 });
 
 const MAX_MESSAGES = 20;

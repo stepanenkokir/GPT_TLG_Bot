@@ -182,18 +182,7 @@ export const handleOpenAiRequest = async (messages, options = {}) => {
     }
 
     const model = getModel();
-    let chatMessages = toChatMessages(messages);
-
-    if (options.verbosityHint) {
-      const systemIdx = chatMessages.findIndex((m) => m.role === "system");
-      if (systemIdx !== -1) {
-        chatMessages = chatMessages.map((m, i) =>
-          i === systemIdx
-            ? { ...m, content: `${m.content}\n\n[Response length instruction: ${options.verbosityHint}]` }
-            : m
-        );
-      }
-    }
+    const chatMessages = toChatMessages(messages);
 
     const completionParams = {
       model,
@@ -240,9 +229,6 @@ export const handleOpenAiRequestWithWebSearch = async (
 
     // Преобразуем сообщения в единый текстовый ввод для Responses API
     const chatMessages = toChatMessages(messages);
-    const verbosityLine = options.verbosityHint
-      ? `\n\n[Response length instruction: ${options.verbosityHint}]`
-      : "";
     const input = chatMessages
       .map((m) => {
         const content = Array.isArray(m.content)
@@ -252,7 +238,7 @@ export const handleOpenAiRequestWithWebSearch = async (
               .join("\n")
           : String(m.content || "");
         const role = m.role || "user";
-        if (role === "system") return `System: ${content}${verbosityLine}`;
+        if (role === "system") return `System: ${content}`;
         if (role === "assistant") return `Assistant: ${content}`;
         return `User: ${content}`;
       })

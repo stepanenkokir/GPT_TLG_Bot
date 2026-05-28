@@ -5,11 +5,9 @@ import {
   handleOpenAiVoice,
   handleOpenAiRequestVoice,
 } from "../openai.js";
-import * as menu from "../tlgBotMenu.js";
 import { replyInChunks } from "../telegramUtils.js";
 import { handleError } from "../../utils/errorHandler.js";
 import {
-  DEFAULT_VERBOSITY,
   checkSession,
   createNewSession,
   roles,
@@ -72,17 +70,11 @@ export const textHandler = async (ctx, userMessage) => {
 
       const trimmedMessages = trimMessages(ctx.session.messages);
 
-      const verbosityKey = ctx.session.parametres.verbosity ?? DEFAULT_VERBOSITY;
-      const verbosityConfig = menu.VERBOSITY_LEVELS[verbosityKey] ?? menu.VERBOSITY_LEVELS[DEFAULT_VERBOSITY];
-      const openAiOptions = {
-        verbosityHint: verbosityConfig.hint,
-      };
-
       const useWeb = Boolean(ctx.session.parametres.useWebSearch);
       const handler = useWeb
         ? handleOpenAiRequestWithWebSearch
         : handleOpenAiRequest;
-      const { text, error, userMessage: userErrMessage } = await handler(trimmedMessages, openAiOptions);
+      const { text, error, userMessage: userErrMessage } = await handler(trimmedMessages);
 
       if (error) {
         await replyInChunks(

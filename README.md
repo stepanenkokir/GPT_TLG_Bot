@@ -55,7 +55,7 @@ npm run dev
 - `OPENAI_MODEL` - Модель GPT (по умолчанию: gpt-4o-mini)
 - `OPENAI_REALTIME_MODEL` - Модель для realtime (по умолчанию: gpt-4o-realtime-preview-2025-06-03)
 - `WEBAPP_PORT` - Порт для веб-приложения (по умолчанию: 3000)
-- `WEBAPP_BASE_URL` - Базовый URL веб-приложения
+- `WEBAPP_BASE_URL` - Базовый URL веб-приложения (для Telegram Web App только `https://`)
 - `WEBAPP_TEST_MODE` - Режим тестирования (true/false)
 
 Полный список переменных см. в `.env.example`.
